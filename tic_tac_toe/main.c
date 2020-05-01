@@ -21,7 +21,7 @@ int main()
     };
     while (go==0) {
         printf("Xs or Os?\r\n");
-        scanf(&X_or_O);
+        scanf("%c", &X_or_O);
         if (X_or_O=='X'||X_or_O=='x') {
             printf("You have Chosen Xs\r\n");
             X_or_O = 'X';
@@ -43,17 +43,17 @@ int main()
 void play(char board[][3], char X_or_O, int inner) {
     int i, j, play_valid;
     int go = 0;
-    char place_to_play[5];
+    char place_to_play[6];
 
     print_board(board, 3);
 
     while (go==0) {
         printf("Where do you want to play?\r\nFormat(x, y)\r\n");
-        scanf(&place_to_play);
+        scanf("%s", &place_to_play);
         play_valid = fnmatch("(?, ?)", place_to_play, 0);
         if (play_valid==0) {
             i = place_to_play[1];
-            j = place_to_play[4];
+            j = place_to_play[5];
             go = 1;
         }
         else {
@@ -106,7 +106,7 @@ void print_board(char board[][3], int inner) {
     int i, j;
 
     printf("0\t1\t2\t3\r\n");
-    for (i=0;i<=3;i++) {
+    for (i=0;i<3;i++) {
         printf("%i\t",i+1);
         for (j=0;j<=3;j++) {
             if (j==3) printf("%c\r\n", board[i][j]);
