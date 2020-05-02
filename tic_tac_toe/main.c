@@ -48,6 +48,8 @@ void play(char board[][board_size], char X_or_O) {
     int go = 0;
     char place_to_play[50];
     char buffer[50];
+    i = 0;
+    j = 0;
 
     printf("Player's move:\r\n");
     print_board(board);
@@ -114,6 +116,9 @@ void com_play(char board[][board_size], char X_or_O) {
     else if (X_or_O=='O') {
         com = 'X';
     }
+    else {
+        com = 'O';
+    }
 
     while (go==0) {
         i = (lrand48() % 3);
@@ -136,6 +141,7 @@ void grade(char board[][board_size], char X_or_O) {
 
     if (X_or_O=='X') com = 'O';
     else if (X_or_O=='O') com = 'X';
+    else com = 'O';
 
     if (check(board, X_or_O)==0) {
         printf("Player Wins!\r\n");
