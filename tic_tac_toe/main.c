@@ -27,7 +27,7 @@ int main()
     while (go==0) {
         printf("Xs or Os?\r\n");
         fgets(buffer, sizeof(buffer), stdin);
-        X_or_O = buffer[0];
+        sscanf(buffer, "%c", X_or_O);
         //scanf("%c", &X_or_O);
         if (X_or_O=='X'||X_or_O=='x') {
             printf("You have Chosen Xs\r\n");
