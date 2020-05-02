@@ -28,7 +28,6 @@ int main()
         printf("Xs or Os?\r\n");
         fgets(buffer, sizeof(buffer), stdin);
         sscanf(buffer, "%c", X_or_O);
-        //scanf("%c", &X_or_O);
         if (X_or_O=='X'||X_or_O=='x') {
             printf("You have Chosen Xs\r\n");
             X_or_O = 'X';
@@ -62,7 +61,6 @@ void play(char board[][board_size], char X_or_O) {
         printf("Where do you want to play?\r\nFormat(x,y)\r\n");
         fgets(buffer, sizeof(buffer), stdin);
         sscanf(buffer, "%s", place_to_play);
-        //scanf("%s", place_to_play);
         play_valid = fnmatch("(?,?)", place_to_play, 0);
         if (play_valid==0) {
             switch (place_to_play[1]) {
