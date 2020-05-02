@@ -46,14 +46,16 @@ void play(char board[][3], char X_or_O) {
     int i, j, play_valid;
     int go = 0;
     char place_to_play[50];
-    i, j = 0;
+    char buffer[50];
 
     printf("Player's move:\r\n");
     print_board(board);
 
     while (go==0) {
         printf("Where do you want to play?\r\nFormat(x,y)\r\n");
-        scanf("%s", place_to_play);
+        fgets(buffer, 50, stdin);
+        sscanf(buffer, "%s", place_to_play);
+        //scanf("%s", place_to_play);
         play_valid = fnmatch("(?,?)", place_to_play, 0);
         if (play_valid==0) {
             switch (place_to_play[1]) {
@@ -83,10 +85,7 @@ void play(char board[][3], char X_or_O) {
                 printf("%c is not valid\r\n", place_to_play[3]);
             }
             /*checks if the spot is vaild to play*/
-            if (board[i-1][j-1]=='X' || board[i-1][j-1]=='O') {
-            /* Do Nothing*/
-            }
-            else if (board[i-1][j-1] == '*') {
+            if (board[i-1][j-1] == '*') {
                 go = 1;
             }
         }
