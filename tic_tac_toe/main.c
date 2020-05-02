@@ -3,20 +3,21 @@
 #include <string.h>
 #include <fnmatch.h>
 #include <time.h>
+#define board_size 3
 
-void play(char board[][3], char X_or_O);
-void com_play(char board[][3], char X_or_O);
-void grade(char board[][3], char X_or_O);
-void print_board(char board[][3]);
-int check(char board[][3], char XO);
-int check_tie(char board[][3]);
+void play(char board[][board_size], char X_or_O);
+void com_play(char board[][board_size], char X_or_O);
+void grade(char board[][board_size], char X_or_O);
+void print_board(char board[][board_size]);
+int check(char board[][board_size], char XO);
+int check_tie(char board[][board_size]);
 
 
 int main()
 {
     char X_or_O;
     int go = 0;
-    char board[3][3] = {
+    char board[board_size][board_size] = {
         {'*','*','*'},
         {'*','*','*'},
         {'*','*','*'}
@@ -42,7 +43,7 @@ int main()
     return 0;
 }
 
-void play(char board[][3], char X_or_O) {
+void play(char board[][board_size], char X_or_O) {
     int i, j, play_valid;
     int go = 0;
     char place_to_play[50];
@@ -53,7 +54,7 @@ void play(char board[][3], char X_or_O) {
 
     while (go==0) {
         printf("Where do you want to play?\r\nFormat(x,y)\r\n");
-        fgets(buffer, 50, stdin);
+        fgets(buffer, sizeof(buffer), stdin);
         sscanf(buffer, "%s", place_to_play);
         //scanf("%s", place_to_play);
         play_valid = fnmatch("(?,?)", place_to_play, 0);
@@ -99,7 +100,7 @@ void play(char board[][3], char X_or_O) {
     grade(board, X_or_O);
 }
 
-void com_play(char board[][3], char X_or_O) {
+void com_play(char board[][board_size], char X_or_O) {
     char com;
     int i, j;
     int go = 0;
@@ -130,7 +131,7 @@ void com_play(char board[][3], char X_or_O) {
     return;
 }
 
-void grade(char board[][3], char X_or_O) {
+void grade(char board[][board_size], char X_or_O) {
     char com;
 
     if (X_or_O=='X') com = 'O';
@@ -151,7 +152,7 @@ void grade(char board[][3], char X_or_O) {
 
 }
 
-void print_board(char board[][3]) {
+void print_board(char board[][board_size]) {
     int i, j;
 
     printf("0\t1\t2\t3\r\n");
@@ -165,7 +166,7 @@ void print_board(char board[][3]) {
     return;
 }
 
-int check(char board[][3], char XO) {
+int check(char board[][board_size], char XO) {
     if (board[0][0] == XO && board[0][1] == XO && board[0][2] == XO) {
         return 0;
     }
@@ -195,7 +196,7 @@ int check(char board[][3], char XO) {
     }
 }
 
-int check_tie(char board[][3]) {
+int check_tie(char board[][board_size]) {
     int i, j;
     int plays = 0;
 
