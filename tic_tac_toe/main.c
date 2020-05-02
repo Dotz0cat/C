@@ -5,12 +5,12 @@
 #include <time.h>
 #define board_size 3
 
-void play(char board[][board_size], char X_or_O);
-void com_play(char board[][board_size], char X_or_O);
-void grade(char board[][board_size], char X_or_O);
-void print_board(char board[][board_size]);
-int check(char board[][board_size], char XO);
-int check_tie(char board[][board_size]);
+static void play(char board[][board_size], char X_or_O);
+static void com_play(char board[][board_size], char X_or_O);
+static void grade(char board[][board_size], char X_or_O);
+static void print_board(char board[][board_size]);
+static int check(char board[][board_size], char XO);
+static int check_tie(char board[][board_size]);
 
 
 int main()
@@ -29,8 +29,8 @@ int main()
 
     while (go==0) {
         printf("Xs or Os?\r\n");
-        fgets(buffer, sizeof(buffer), stdin);
-        sscanf(buffer, "%c", &X_or_O);
+        (void) fgets(buffer, (int)sizeof(buffer), stdin);
+        (void) sscanf(buffer, "%c", &X_or_O);
         if (X_or_O=='X'||X_or_O=='x') {
             printf("You have Chosen Xs\r\n");
             X_or_O = 'X';
@@ -62,8 +62,8 @@ void play(char board[][board_size], char X_or_O) {
 
     while (go==0) {
         printf("Where do you want to play?\r\nFormat(x,y)\r\n");
-        fgets(buffer, sizeof(buffer), stdin);
-        sscanf(buffer, "%s", place_to_play);
+        (void) fgets(buffer, (int)sizeof(buffer), stdin);
+        (void) sscanf(buffer, "%s", place_to_play);
         play_valid = fnmatch("(?,?)", place_to_play, 0);
         if (play_valid==0) {
             switch (place_to_play[1]) {
