@@ -45,7 +45,8 @@ int main()
 void play(char board[][3], char X_or_O) {
     int i, j, play_valid;
     int go = 0;
-    char place_to_play[6];
+    char place_to_play[50];
+    i, j = 0;
 
     printf("Player's move:\r\n");
     print_board(board);
@@ -85,7 +86,7 @@ void play(char board[][3], char X_or_O) {
             if (board[i-1][j-1]=='X' || board[i-1][j-1]=='O') {
             /* Do Nothing*/
             }
-            else {
+            else if (board[i-1][j-1] == '*') {
                 go = 1;
             }
         }
@@ -117,9 +118,6 @@ void com_play(char board[][3], char X_or_O) {
     while (go==0) {
         i = (lrand48() % 3);
         j = (lrand48() % 3);
-        /*i = (rand() % 3);
-        j = (rand() % 3);*/
-        printf("%i %i\r\n", i, j);
         if (board[i][j]=='X' || board[i][j]=='O') {
             /* Do nothing*/
         }
@@ -204,7 +202,7 @@ int check_tie(char board[][3]) {
 
     for (i = 0; i < 3; i++) {
         for (j = 0; j < 3; j++) {
-            if (board[i][j]!='X' || board[i][j] != 'O') {
+            if (board[i][j] =='X' || board[i][j] == 'O') {
                 plays++;
             }
         }
