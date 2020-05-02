@@ -102,8 +102,8 @@ void com_play(char board[][3], char X_or_O, int inner) {
         com = 'X';
     }
 
-    i = (rand() % (3-1+1)+1);
-    j = (rand() % (3-1+1)+1);
+    i = (rand() % 3);
+    j = (rand() % 3);
     board[i][j] = com;
     printf("Computers move:\r\n");
     print_board(board, 3);
