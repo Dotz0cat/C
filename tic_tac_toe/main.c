@@ -94,6 +94,7 @@ void play(char board[][3], char X_or_O, int inner) {
 void com_play(char board[][3], char X_or_O, int inner) {
     char com;
     int i, j;
+    int go = 0;
 
     if (X_or_O=='X') {
         com = 'O';
@@ -102,9 +103,17 @@ void com_play(char board[][3], char X_or_O, int inner) {
         com = 'X';
     }
 
-    i = (rand() % 3);
-    j = (rand() % 3);
-    board[i][j] = com;
+    while (go==0) {
+        i = (rand() % 3);
+        j = (rand() % 3);
+        if (board[i][j]==X_or_O) {
+            /* Do nothing*/
+        }
+        else {
+            board[i][j] = com;
+            go = 1;
+        }
+    }
     printf("Computers move:\r\n");
     print_board(board, 3);
     return;
