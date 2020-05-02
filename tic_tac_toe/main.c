@@ -45,15 +45,40 @@ void play(char board[][3], char X_or_O, int inner) {
     int go = 0;
     char place_to_play[6];
 
+    printf("Player's move:\r\n");
     print_board(board, 3);
 
     while (go==0) {
-        printf("Where do you want to play?\r\nFormat(x, y)\r\n");
+        printf("Where do you want to play?\r\nFormat(x,y)\r\n");
         scanf("%s", &place_to_play);
-        play_valid = fnmatch("(?, ?)", place_to_play, 0);
+        play_valid = fnmatch("(?,?)", place_to_play, 0);
         if (play_valid==0) {
-            i = place_to_play[1];
-            j = place_to_play[5];
+            switch (place_to_play[1]) {
+            case ('1'):
+                i = 1;
+                break;
+            case ('2'):
+                i = 2;
+                break;
+            case ('3'):
+                i = 3;
+                break;
+            default:
+                printf("%c is not valid\r\n", place_to_play[1]);
+            }
+            switch (place_to_play[3]) {
+            case ('1'):
+                j = 1;
+                break;
+            case ('2'):
+                j = 2;
+                break;
+            case ('3'):
+                j = 3;
+                break;
+            default:
+                printf("%c is not valid\r\n", place_to_play[3]);
+            }
             go = 1;
         }
         else {
@@ -63,7 +88,7 @@ void play(char board[][3], char X_or_O, int inner) {
     board[i-1][j-1] = X_or_O;
     print_board(board, 3);
     com_play(&board, X_or_O, 3);
-    grade(& *board, X_or_O, 3);
+    grade(&board, X_or_O, 3);
 }
 
 void com_play(char board[][3], char X_or_O, int inner) {
@@ -82,6 +107,7 @@ void com_play(char board[][3], char X_or_O, int inner) {
     board[i][j] = com;
     printf("Computers move:\r\n");
     print_board(board, 3);
+    return;
 }
 
 void grade(char board[][3], char X_or_O, int inner) {
@@ -108,11 +134,12 @@ void print_board(char board[][3], int inner) {
     printf("0\t1\t2\t3\r\n");
     for (i=0;i<3;i++) {
         printf("%i\t",i+1);
-        for (j=0;j<=3;j++) {
-            if (j==3) printf("%c\r\n", board[i][j]);
+        for (j=0;j<3;j++) {
+            if (j==2) printf("%c\r\n", board[i][j]);
             else printf("%c\t", board[i][j]);
         }
     }
+    return;
 }
 
 int check(char board[][3], char XO, int inner) {
