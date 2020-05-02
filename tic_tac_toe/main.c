@@ -24,10 +24,13 @@ int main()
     };
     char buffer[50];
 
+    //hard coded so gcc does not yell at me
+    X_or_O = 'X';
+
     while (go==0) {
         printf("Xs or Os?\r\n");
         fgets(buffer, sizeof(buffer), stdin);
-        sscanf(buffer, "%c", X_or_O);
+        sscanf(buffer, "%c", &X_or_O);
         if (X_or_O=='X'||X_or_O=='x') {
             printf("You have Chosen Xs\r\n");
             X_or_O = 'X';
