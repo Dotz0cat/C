@@ -22,9 +22,13 @@ int main()
         {'*','*','*'},
         {'*','*','*'}
     };
+    char buffer[50];
+
     while (go==0) {
         printf("Xs or Os?\r\n");
-        scanf("%c", &X_or_O);
+        fgets(buffer, sizeof(buffer), stdin);
+        X_or_O = buffer[0];
+        //scanf("%c", &X_or_O);
         if (X_or_O=='X'||X_or_O=='x') {
             printf("You have Chosen Xs\r\n");
             X_or_O = 'X';
