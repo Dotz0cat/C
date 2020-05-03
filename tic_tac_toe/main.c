@@ -8,6 +8,7 @@
 static void play(char board[][board_size], char X_or_O);
 static void com_play(char board[][board_size], char X_or_O);
 static void grade(char board[][board_size], char X_or_O);
+static int pre_grade(char board[][board_size], char X_or_O);
 static void print_board(char board[][board_size]);
 static int check(char board[][board_size], char XO);
 static int check_tie(char board[][board_size]);
@@ -103,8 +104,15 @@ void play(char board[][board_size], char X_or_O) {
     }
     board[i-1][j-1] = X_or_O;
     print_board(board);
-    com_play(board, X_or_O);
-    grade(board, X_or_O);
+    if (pre_grade(board, X_or_O)!=0) {
+        /*
+        this code is here to solve the double win problem
+        before this was here it would only check if you won after the computer played
+        now it checks before and after the computer plays.
+        */
+        com_play(board, X_or_O);
+        grade(board, X_or_O);
+    }
 }
 
 void com_play(char board[][board_size], char X_or_O) {
@@ -155,10 +163,35 @@ void grade(char board[][board_size], char X_or_O) {
         printf("Computer Wins\r\n");
     }
     else if (check_tie(board)==0) {
-        printf("Tie");
+        printf("Tie\r\n");
     }
     else {
         play(board, X_or_O);
+    }
+
+}
+
+int pre_grade(char board[][board_size], char X_or_O) {
+    char com;
+
+    if (X_or_O=='X') com = 'O';
+    else if (X_or_O=='O') com = 'X';
+    else com = 'O';
+
+    if (check(board, X_or_O)==0) {
+        printf("Player Wins!\r\n");
+        return 0;
+    }
+    else if (check(board, com)==0) {
+        printf("Computer Wins\r\n");
+        return 0;
+    }
+    else if (check_tie(board)==0) {
+        printf("Tie\r\n");
+        return 0;
+    }
+    else {
+        return 1;
     }
 
 }
