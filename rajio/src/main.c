@@ -15,8 +15,8 @@
 static void print_help();
 static int socket_stuff(char* ip, int port);
 static void play_audio(int socket_num);
-static void clean_up(pa_simple *s, int socket_num);
-static void sigint_catcher()
+//static void clean_up(pa_simple *s, int socket_num);
+//static void sigint_catcher();
 
 
 
@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
             return 0;
             break;
         case (2):
-            if ((fnmatch(argv[0], "+.+.+.+")==0)) {
+            if ((fnmatch(argv[0], "+.+.+.+", 0)==0)) {
                 #ifdef DEBUG:
                     printf(argv[0]);
                 #endif
@@ -60,7 +60,7 @@ void print_help() {
 
 int socket_stuff(char* ip, int port) {
     //make socket
-        int socket;
+        int socket_num;
         int connection;
         char get[100];
 
@@ -69,17 +69,18 @@ int socket_stuff(char* ip, int port) {
         strcat(get, "GET / HTTP/1.1\r\nHost: ");
         strcat(get, ip);
         strcat(get, ":");
-        strcat(get, port);
+        strcat(get, "20278");
+        //hardcoded just to attemp to test it
         strcat(get, "\r\nAccept: */*");
 
-        socket = socket(AF_INET, SOCK_STREAM, 0);
+        socket_num = socket(AF_INET, SOCK_STREAM, 0);
 
         //connect
         struct sockaddr_in server_addres;
         server_addres.sin_family = AF_INET;
         server_addres.sin_port = htons(port);
-        inet_aton(ip, server_addres.sin_addr);
-        connection = connect(socket, (sockaddr *) &server_addres, sizeof(server_addres));
+        inet_aton(ip, &server_addres.sin_addr);
+        connection = connect(socket_num, (struct sockaddr*)&server_addres, sizeof(server_addres));
         if (connection!=0) {
             fprintf(stderr, "The ip adress is not valid or the connection failed\r\n");
             return connection;
@@ -87,14 +88,16 @@ int socket_stuff(char* ip, int port) {
 
         //plays audio
         //need to add a get request
-
-        play_audio(socket);
-
+        send(socket, get, sizeof(get), 0);
+        play_audio(socket_num);
+        return 0;
 }
 
 void play_audio(int socket_num) {
     pa_simple *s;
     pa_sample_spec ss;
+    char buffer[5120];
+    int go = 1;
 
     ss.format = PA_SAMPLE_S16NE;
     ss.channels = 2;
@@ -102,9 +105,13 @@ void play_audio(int socket_num) {
 
     s = pa_simple_new(NULL, "rajio", PA_STREAM_PLAYBACK, NULL, "internet radio", &ss, NULL, NULL, NULL);
     //need to figure out how to buffer the data from the socket and then play it while refilling the buffer
-
+    while (go==1) {
+        recv(socket_num, buffer, sizeof(buffer), 0);
+        pa_simple_write(&s, buffer, sizeof(buffer), NULL);
+    }
 }
 
+/*
 void clean_up(pa_simple *s, int socket_num) {
     pa_simple_flush(s,NULL);
 
@@ -115,4 +122,4 @@ void sigint_catcher() {
     //dont know how to get values for clean_up()
     clean_up();
 }
-
+*/
