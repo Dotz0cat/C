@@ -22,6 +22,7 @@ static void play_audio(int socket_num);
 
 int main(int argc, char *argv[])
 {
+    int success;
     // print help if -h
     if (argc==0) {
        print_help();
@@ -29,27 +30,20 @@ int main(int argc, char *argv[])
     }
     else if (argc!=0) {
         switch (argc) {
-        case (1):
-            print_help();
-            return 0;
-            break;
-        case (2):
-            if ((fnmatch(argv[0], "+.+.+.+", 0)==0)) {
-                #ifdef DEBUG:
-                    printf(argv[0]);
-                #endif
-                if (atoi(argv[1])!=0) {
-                    int success = socket_stuff(argv[0], atoi(argv[1]));
-                    return success;
-                }
-            }
+        case (3):
+            #ifdef DEBUG
+                printf(argv[1]);
+            #endif
+            success = socket_stuff(argv[1], atoi(argv[2]));
+            return success;
         default:
             print_help();
             return 0;
         }
     }
+    success = 0;
 
-    return 0;
+    return success;
 }
 
 void print_help() {
@@ -79,7 +73,11 @@ int socket_stuff(char* ip, int port) {
         struct sockaddr_in server_addres;
         server_addres.sin_family = AF_INET;
         server_addres.sin_port = htons(port);
-        inet_aton(ip, &server_addres.sin_addr);
+        int some = inet_aton(ip, &server_addres.sin_addr);
+        if (some==0) {
+            fprintf(stderr, "ip is not valid\r\n");
+            return some;
+        }
         connection = connect(socket_num, (struct sockaddr*)&server_addres, sizeof(server_addres));
         if (connection!=0) {
             fprintf(stderr, "The ip adress is not valid or the connection failed\r\n");
@@ -88,7 +86,7 @@ int socket_stuff(char* ip, int port) {
 
         //plays audio
         //need to add a get request
-        send(socket, get, sizeof(get), 0);
+        send(socket_num, get, sizeof(get), 0);
         play_audio(socket_num);
         return 0;
 }
@@ -107,7 +105,7 @@ void play_audio(int socket_num) {
     //need to figure out how to buffer the data from the socket and then play it while refilling the buffer
     while (go==1) {
         recv(socket_num, buffer, sizeof(buffer), 0);
-        pa_simple_write(&s, buffer, sizeof(buffer), NULL);
+        pa_simple_write(s, buffer, sizeof(buffer), NULL);
     }
 }
 
