@@ -65,7 +65,7 @@ int socket_stuff(char* ip, int port) {
         strcat(get, ":");
         strcat(get, "20278");
         //hardcoded just to attemp to test it
-        strcat(get, "\r\nAccept: */*");
+        strcat(get, "\r\nAccept: */*\r\n\r\n");
 
         socket_num = socket(AF_INET, SOCK_STREAM, 0);
 
