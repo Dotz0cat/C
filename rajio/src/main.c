@@ -9,8 +9,14 @@
 //#include <AL/alc.h>
 #include <pulse/simple.h>
 #include <signal.h>
+#include <string.h>
 
 //prototypes
+static void print_help();
+static int socket_stuff(char* ip, int port);
+static void play_audio(int socket_num);
+static void clean_up(pa_simple *s, int socket_num);
+static void sigint_catcher()
 
 
 
@@ -56,6 +62,16 @@ int socket_stuff(char* ip, int port) {
     //make socket
         int socket;
         int connection;
+        char get[100];
+
+        //makes the get request
+        //need to get this fixxed it is not protected
+        strcat(get, "GET / HTTP/1.1\r\nHost: ");
+        strcat(get, ip);
+        strcat(get, ":");
+        strcat(get, port);
+        strcat(get, "\r\nAccept: */*");
+
         socket = socket(AF_INET, SOCK_STREAM, 0);
 
         //connect
