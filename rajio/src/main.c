@@ -22,7 +22,9 @@ static int play_audio(int socket_num);
 //static void sigint_catcher();
 
 
-
+/*
+    My test case for this program is 158.69.38.195 port 20278
+*/
 int main(int argc, char *argv[])
 {
     int success;
