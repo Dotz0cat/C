@@ -10,11 +10,14 @@
 #include <pulse/simple.h>
 #include <signal.h>
 #include <string.h>
+#include <libavutil/opt.h>
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 
 //prototypes
 static void print_help();
 static int socket_stuff(char* ip, int port);
-static void play_audio(int socket_num);
+static int play_audio(int socket_num);
 //static void clean_up(pa_simple *s, int socket_num);
 //static void sigint_catcher();
 
@@ -57,6 +60,7 @@ int socket_stuff(char* ip, int port) {
         int socket_num;
         int connection;
         char get[100];
+        int played;
 
         //makes the get request
         //need to get this fixxed it is not protected
@@ -87,26 +91,44 @@ int socket_stuff(char* ip, int port) {
         //plays audio
         //need to add a get request
         send(socket_num, get, sizeof(get), 0);
-        play_audio(socket_num);
-        return 0;
+        played = play_audio(socket_num);
+        return played;
 }
 
-void play_audio(int socket_num) {
+int play_audio(int socket_num) {
     pa_simple *s;
     pa_sample_spec ss;
-    char buffer[5120];
+    char network_buffer[5120];
+    char audio_buffer[5120];
     int go = 1;
+    int holder;
 
     ss.format = PA_SAMPLE_S16NE;
     ss.channels = 2;
     ss.rate = 44100;
+    //libav stuff
+    av_register_all();
 
     s = pa_simple_new(NULL, "rajio", PA_STREAM_PLAYBACK, NULL, "internet radio", &ss, NULL, NULL, NULL);
+
+    AVFormatContext* format = avformat_alloc_context();
+    //run first recive outside of loop then start looping
+    recv(socket_num, network_buffer, sizeof(network_buffer), 0);
+    recv(socket_num, network_buffer, sizeof(network_buffer), 0);
+    if ((holder = avformat_open_input(&format, network_buffer, NULL, NULL))==-1) {
+        return holder;
+    }
+    if ((holder = avformat_find_stream_info(format, NULL))==-1) {
+        return holder;
+    }
+
+
     //need to figure out how to buffer the data from the socket and then play it while refilling the buffer
     while (go==1) {
-        recv(socket_num, buffer, sizeof(buffer), 0);
-        pa_simple_write(s, buffer, sizeof(buffer), NULL);
+        recv(socket_num, network_buffer, sizeof(network_buffer), 0);
+        pa_simple_write(s, network_buffer, sizeof(network_buffer), NULL);
     }
+    return 0;
 }
 
 /*
