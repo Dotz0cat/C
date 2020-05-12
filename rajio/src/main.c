@@ -56,13 +56,13 @@ int main(int argc, char *argv[])
     return success;
 }
 
-void print_help() {
+static void print_help() {
     printf("the proper way to use this program at the moment is with the syantax\r\n");
     printf("rajio ip_of_station port\r\n");
     printf("or rajio url port\r\nthat is when i figure out dns\r\n");
 }
 
-int socket_stuff(char* ip, int port) {
+static int socket_stuff(char* ip, int port) {
     //make socket
         int socket_num;
         int connection;
@@ -71,7 +71,7 @@ int socket_stuff(char* ip, int port) {
         char port_str[10];
 
         //converts port to string
-        fprintf(port_str, "%i", port);
+        //fprintf(port_str, "%i", port);
 
         //makes the get request
         //need to get this fixxed it is not protected
@@ -106,10 +106,10 @@ int socket_stuff(char* ip, int port) {
         return played;
 }
 
-int play_audio(int socket_num) {
+static int play_audio(int socket_num) {
     pa_simple *s;
     pa_sample_spec ss;
-    uint8_t network_buffer[5120];
+    uint8_t* network_buffer;
     struct buffer_data buf;
     //char audio_buffer[5120];
     int go = 1;
@@ -123,14 +123,22 @@ int play_audio(int socket_num) {
 
     s = pa_simple_new(NULL, "rajio", PA_STREAM_PLAYBACK, NULL, "internet radio", &ss, NULL, NULL, NULL);
 
+
+    //memalloc network_buffer to stop a segfault
+    network_buffer = (uint8_t*)malloc((12*1024) * sizeof(uint8_t));
+
+
     recv(socket_num, network_buffer, sizeof(network_buffer), 0);
 
     buf.ptr = network_buffer;
     buf.size = sizeof(network_buffer);
     /**/
     //stuff i wish i could put elsewhere
-    int buffer_size = 5 * 1024;
-    uint8_t pbuffer[buffer_size];
+    int buffer_size = 12 * 1024;
+    unsigned char* pbuffer;
+
+    //attempting to fix a bad free
+    pbuffer = (unsigned char*)malloc(buffer_size * sizeof(unsigned char));
 
     //i dont even understand half of this
     AVIOContext* pIOCtx = avio_alloc_context(pbuffer, buffer_size, 0, &buf, &read_packet, NULL, NULL);
