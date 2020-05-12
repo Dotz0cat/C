@@ -21,9 +21,6 @@ static int play_audio(int socket_num);
 
 static int read_packet(void *opaque, uint8_t *buf, int buf_size);
 
-//static void clean_up(pa_simple *s, int socket_num);
-//static void sigint_catcher();
-
 
 struct buffer_data {
     uint8_t *ptr;
@@ -154,6 +151,21 @@ int play_audio(int socket_num) {
         return holder;
     }
 
+    size_t stream = 0;
+
+    for (; stream < pCtx->nb_streams; stream++) {
+        if (pCtx->streams[stream]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+            continue;
+        }
+    }
+
+    AVCodecContext* codec_context = pCtx->streams[stream]->codec;
+
+    if (codec_context->channel_layout == 0) {
+        codec_context->channel_layout = AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT;
+    }
+
+    AVCodec* codec1 = avcodec_find_decoder(codec_context->codec_id);
 
     //need to figure out how to buffer the data from the socket and then play it while refilling the buffer
     while (go==1) {
@@ -178,15 +190,4 @@ static int read_packet(void *opaque, uint8_t *buf, int buf_size)
     return buf_size;
 }
 
-/*
-void clean_up(pa_simple *s, int socket_num) {
-    pa_simple_flush(s,NULL);
 
-    close(socket_num);
-}
-
-void sigint_catcher() {
-    //dont know how to get values for clean_up()
-    clean_up();
-}
-*/
