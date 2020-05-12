@@ -63,13 +63,17 @@ int socket_stuff(char* ip, int port) {
         int connection;
         char get[100];
         int played;
+        char port_str[10];
+
+        //converts port to string
+        fprintf(port_str, "%i", port);
 
         //makes the get request
         //need to get this fixxed it is not protected
         strcat(get, "GET / HTTP/1.1\r\nHost: ");
         strcat(get, ip);
         strcat(get, ":");
-        strcat(get, "20278");
+        strcat(get, port_str);
         //hardcoded just to attemp to test it
         strcat(get, "\r\nAccept: */*\r\n\r\n");
 
