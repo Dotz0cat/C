@@ -15,7 +15,7 @@
 #include <libavformat/avformat.h>
 
 //prototypes
-static void print_help();
+static void print_help(void);
 static int socket_stuff(char* ip, int port);
 static int play_audio(int socket_num);
 
@@ -66,16 +66,15 @@ static int socket_stuff(char* ip, int port) {
     //make socket
         int socket_num;
         int connection;
-        char get[100];
+        char get[100] = "GET / HTTP/1.1\r\nHost: ";
         int played;
-        char port_str[10];
+        char port_str[20];
 
         //converts port to string
-        //fprintf(port_str, "%i", port);
+        sprintf(port_str, "%i", port);
 
         //makes the get request
         //need to get this fixxed it is not protected
-        strcat(get, "GET / HTTP/1.1\r\nHost: ");
         strcat(get, ip);
         strcat(get, ":");
         strcat(get, port_str);
@@ -87,7 +86,7 @@ static int socket_stuff(char* ip, int port) {
         //connect
         struct sockaddr_in server_addres;
         server_addres.sin_family = AF_INET;
-        server_addres.sin_port = htons(port);
+        server_addres.sin_port = htons((uint16_t)port);
         int some = inet_aton(ip, &server_addres.sin_addr);
         if (some==0) {
             fprintf(stderr, "ip is not valid\r\n");
@@ -138,7 +137,7 @@ static int play_audio(int socket_num) {
     unsigned char* pbuffer;
 
     //attempting to fix a bad free
-    pbuffer = (unsigned char*)malloc(buffer_size * sizeof(unsigned char));
+    pbuffer = (unsigned char*)malloc((unsigned long)buffer_size * sizeof(unsigned char));
 
     //i dont even understand half of this
     AVIOContext* pIOCtx = avio_alloc_context(pbuffer, buffer_size, 0, &buf, &read_packet, NULL, NULL);
@@ -187,14 +186,14 @@ static int play_audio(int socket_num) {
 static int read_packet(void *opaque, uint8_t *buf, int buf_size)
 {
     struct buffer_data *bd = (struct buffer_data *)opaque;
-    buf_size = FFMIN(buf_size, bd->size);
+    buf_size = FFMIN(buf_size, (int)bd->size);
     if (!buf_size)
         return AVERROR_EOF;
-    printf("ptr:%p size:%zu\n", bd->ptr, bd->size);
+    printf("ptr:%p size:%zu\n", (void *)bd->ptr, bd->size);
     /* copy internal buffer data to buf */
-    memcpy(buf, bd->ptr, buf_size);
+    memcpy(buf, bd->ptr, (unsigned long)buf_size);
     bd->ptr  += buf_size;
-    bd->size -= buf_size;
+    bd->size -= (unsigned long)buf_size;
     return buf_size;
 }
 
