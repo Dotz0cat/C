@@ -18,9 +18,17 @@
 static void print_help();
 static int socket_stuff(char* ip, int port);
 static int play_audio(int socket_num);
+
+static int read_packet(void *opaque, uint8_t *buf, int buf_size);
+
 //static void clean_up(pa_simple *s, int socket_num);
 //static void sigint_catcher();
 
+
+struct buffer_data {
+    uint8_t *ptr;
+    size_t size;
+};
 
 /*
     My test case for this program is 158.69.38.195 port 20278
@@ -104,8 +112,9 @@ int socket_stuff(char* ip, int port) {
 int play_audio(int socket_num) {
     pa_simple *s;
     pa_sample_spec ss;
-    char network_buffer[5120];
-    char audio_buffer[5120];
+    uint8_t network_buffer[5120];
+    struct buffer_data buf;
+    //char audio_buffer[5120];
     int go = 1;
     int holder;
 
@@ -117,14 +126,31 @@ int play_audio(int socket_num) {
 
     s = pa_simple_new(NULL, "rajio", PA_STREAM_PLAYBACK, NULL, "internet radio", &ss, NULL, NULL, NULL);
 
-    AVFormatContext* format = avformat_alloc_context();
-    //run first recive outside of loop then start looping
     recv(socket_num, network_buffer, sizeof(network_buffer), 0);
-    recv(socket_num, network_buffer, sizeof(network_buffer), 0);
-    if ((holder = avformat_open_input(&format, network_buffer, NULL, NULL))==-1) {
+
+    buf.ptr = network_buffer;
+    buf.size = sizeof(network_buffer);
+    /**/
+    //stuff i wish i could put elsewhere
+    int buffer_size = 5 * 1024;
+    uint8_t pbuffer[buffer_size];
+
+    //i dont even understand half of this
+    AVIOContext* pIOCtx = avio_alloc_context(pbuffer, buffer_size, 0, &buf, &read_packet, NULL, NULL);
+
+    AVFormatContext* pCtx = avformat_alloc_context();
+
+    pCtx ->pb = pIOCtx;
+
+    pCtx->avio_flags = AVFMT_FLAG_CUSTOM_IO;
+
+
+    /**/
+
+    if ((holder = avformat_open_input(&pCtx, "", NULL, NULL))<0) {
         return holder;
     }
-    if ((holder = avformat_find_stream_info(format, NULL))==-1) {
+    if ((holder = avformat_find_stream_info(pCtx, NULL))<0) {
         return holder;
     }
 
@@ -135,6 +161,21 @@ int play_audio(int socket_num) {
         pa_simple_write(s, network_buffer, sizeof(network_buffer), NULL);
     }
     return 0;
+}
+
+//shamelessly stolen from http://www.ffmpeg.org/doxygen/trunk/avio_reading_8c-example.html
+static int read_packet(void *opaque, uint8_t *buf, int buf_size)
+{
+    struct buffer_data *bd = (struct buffer_data *)opaque;
+    buf_size = FFMIN(buf_size, bd->size);
+    if (!buf_size)
+        return AVERROR_EOF;
+    printf("ptr:%p size:%zu\n", bd->ptr, bd->size);
+    /* copy internal buffer data to buf */
+    memcpy(buf, bd->ptr, buf_size);
+    bd->ptr  += buf_size;
+    bd->size -= buf_size;
+    return buf_size;
 }
 
 /*
