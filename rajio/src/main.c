@@ -118,7 +118,6 @@ static int play_audio(int socket_num) {
     ss.channels = 2;
     ss.rate = 44100;
     //libav stuff
-    av_register_all();
 
     s = pa_simple_new(NULL, "rajio", PA_STREAM_PLAYBACK, NULL, "internet radio", &ss, NULL, NULL, NULL);
 
@@ -152,33 +151,58 @@ static int play_audio(int socket_num) {
     /**/
 
     if ((holder = avformat_open_input(&pCtx, "", NULL, NULL))<0) {
+        fprintf(stderr, "breaks at avformat_open_input\r\n");
         return holder;
     }
     if ((holder = avformat_find_stream_info(pCtx, NULL))<0) {
+        fprintf(stderr, "breaks at avformat find stream\r\n");
         return holder;
     }
 
     size_t stream = 0;
 
     for (; stream < pCtx->nb_streams; stream++) {
-        if (pCtx->streams[stream]->codec->codec_type == AVMEDIA_TYPE_AUDIO) {
+        if (pCtx->streams[stream]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
             continue;
         }
     }
 
-    AVCodecContext* codec_context = pCtx->streams[stream]->codec;
+    AVCodecParameters* codec_prams = pCtx->streams[stream]->codecpar;
 
+
+    AVCodecContext* codec_context = NULL;
+    holder = avcodec_parameters_to_context(codec_context, codec_prams);
+    if (holder != 0) {
+        fprintf(stderr, "something is wrong\r\n");
+        return holder;
+    }
     if (codec_context->channel_layout == 0) {
         codec_context->channel_layout = AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT;
     }
 
     AVCodec* codec1 = avcodec_find_decoder(codec_context->codec_id);
+    if (!codec1) {
+        fprintf(stderr, "codec is broke\r\n");
+        return -1;
+    }
+
+    holder = avcodec_open2(codec_context, codec1, NULL);
+    if (holder<0) {
+        fprintf(stderr, "error avopen context\r\n");
+        return holder;
+    }
+
+
+
 
     //need to figure out how to buffer the data from the socket and then play it while refilling the buffer
     while (go==1) {
         recv(socket_num, network_buffer, sizeof(network_buffer), 0);
         pa_simple_write(s, network_buffer, sizeof(network_buffer), NULL);
     }
+
+    free(network_buffer);
+    free(pbuffer);
     return 0;
 }
 
