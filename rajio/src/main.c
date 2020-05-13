@@ -13,6 +13,7 @@
 #include <libavutil/opt.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include<libavutil/error.h>
 
 //prototypes
 static void print_help(void);
@@ -109,10 +110,12 @@ static int play_audio(int socket_num) {
     pa_simple *s;
     pa_sample_spec ss;
     uint8_t* network_buffer;
+    //uint8_t network_buffer[12 * 1024];
     struct buffer_data buf;
     //char audio_buffer[5120];
     int go = 1;
     int holder;
+    char err[50];
 
     ss.format = PA_SAMPLE_S16NE;
     ss.channels = 2;
@@ -127,6 +130,8 @@ static int play_audio(int socket_num) {
 
 
     recv(socket_num, network_buffer, sizeof(network_buffer), 0);
+
+    //recv(socket_num, network_buffer, sizeof(network_buffer), 0);
 
     buf.ptr = network_buffer;
     buf.size = sizeof(network_buffer);
@@ -152,6 +157,9 @@ static int play_audio(int socket_num) {
 
     if ((holder = avformat_open_input(&pCtx, "", NULL, NULL))<0) {
         fprintf(stderr, "breaks at avformat_open_input\r\n");
+        fprintf(stderr, "%i\r\n", holder);
+        av_make_error_string(err, sizeof(err), holder);
+        fprintf(stderr, err);
         return holder;
     }
     if ((holder = avformat_find_stream_info(pCtx, NULL))<0) {
