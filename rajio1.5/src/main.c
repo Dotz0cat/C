@@ -15,6 +15,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/error.h>
+#include <libswresample/swresample.h>
 
 
 void print_help(void);
@@ -55,13 +56,13 @@ int play_with_libav(char *url) {
     pa_simple *s;
     pa_sample_spec ss;
     uint8_t* audio_buffer;
-    int go = 1;
+    int samples = 512;
     int holder;
     char err[50];
 
     audio_buffer = (uint8_t*)malloc(32*1024);
 
-    ss.format = PA_SAMPLE_S16NE;
+    ss.format = PA_SAMPLE_FLOAT32;
     ss.channels = 2;
     ss.rate = 44100;
     //libav stuff
@@ -103,7 +104,7 @@ int play_with_libav(char *url) {
     }
 
 
-    AVCodecContext* codec_context;
+    AVCodecContext* codec_context = avcodec_alloc_context3(NULL);
 
     holder = avcodec_parameters_to_context(codec_context, codec_prams);
     if (holder != 0) {
@@ -126,8 +127,62 @@ int play_with_libav(char *url) {
         return holder;
     }
 
-    printf("going well add more");
 
+
+    SwrContext* swr_context = swr_alloc_set_opts(NULL, AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT, AV_SAMPLE_FMT_FLT, (int)ss.rate, (long)codec_context->channel_layout, codec_context->sample_fmt, codec_context->sample_rate, 0, NULL);
+    if (!swr_context) {
+        fprintf(stderr, "swr broke");
+        return -1;
+    }
+    swr_init(swr_context);
+
+    AVPacket avpkt;
+    av_init_packet(&avpkt);
+    avpkt.data = NULL;
+    avpkt.size = 0;
+
+    AVFrame* frame = av_frame_alloc();
+
+    holder = 0;
+
+    while (av_read_frame(format, &avpkt) >= 0) {
+        if (avpkt.stream_index != (int)stream) {
+            continue;
+        }
+
+        if (avcodec_send_packet(codec_context, &avpkt) < 0) {
+            fprintf(stderr, "cant send packet");
+            return -1;
+        }
+
+        if (avcodec_receive_frame(codec_context, frame) < 0) {
+            fprintf(stderr, "receive frame");
+            return -1;
+        }
+
+        holder = swr_convert(swr_context, &audio_buffer, samples, (const uint8_t**)&frame->data, frame->nb_samples);
+        if (holder < 0) {
+            fprintf(stderr, "swrconvert not working");
+            return -1;
+        }
+
+        //printf("%i", holder);
+
+         while (holder>0) {
+            pa_simple_write(s, audio_buffer, sizeof(audio_buffer), NULL);
+
+            holder = swr_convert(swr_context, &audio_buffer, samples, NULL, 0);
+            if (holder < 0) {
+                fprintf(stderr, "swr convert on line 174");
+                return -1;
+            }
+         }
+
+        av_packet_unref(&avpkt);
+    }
+
+
+    printf("going well add more\r\n");
 
     free(audio_buffer);
     return 0;
