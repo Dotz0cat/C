@@ -21,6 +21,9 @@
 void print_help(void);
 int play_with_libav(char *url);
 
+/*
+    my useal test case is http://158.69.38.195:20278
+*/
 int main(int argc, char *argv[])
 {
     int success;
