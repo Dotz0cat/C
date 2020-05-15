@@ -60,7 +60,7 @@ int play_with_libav(char *url) {
     int holder;
     char err[50];
 
-    audio_buffer = (uint8_t*)malloc(32*1024);
+    audio_buffer = malloc(32*1024);
 
     ss.format = PA_SAMPLE_FLOAT32;
     ss.channels = 2;
