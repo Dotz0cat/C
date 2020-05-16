@@ -59,7 +59,7 @@ int play_with_libav(char *url) {
     pa_simple *s;
     pa_sample_spec ss;
     uint8_t* audio_buffer;
-    int samples = 512;
+    int samples = 4096;
     int holder;
     char err[50];
 
@@ -134,7 +134,7 @@ int play_with_libav(char *url) {
 
     SwrContext* swr_context = swr_alloc_set_opts(NULL, AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT, AV_SAMPLE_FMT_FLT, (int)ss.rate, (long)codec_context->channel_layout, codec_context->sample_fmt, codec_context->sample_rate, 0, NULL);
     if (!swr_context) {
-        fprintf(stderr, "swr broke");
+        fprintf(stderr, "swr context broke\r\n");
         return -1;
     }
     swr_init(swr_context);
@@ -145,6 +145,7 @@ int play_with_libav(char *url) {
     avpkt.size = 0;
 
     AVFrame* frame = av_frame_alloc();
+    //AVFrame* frame_out = av_frame_alloc();
 
     holder = 0;
 
@@ -154,25 +155,34 @@ int play_with_libav(char *url) {
         }
 
         if (avcodec_send_packet(codec_context, &avpkt) < 0) {
-            fprintf(stderr, "cant send packet");
+            fprintf(stderr, "cant send packet\r\n");
             return -1;
         }
 
         if (avcodec_receive_frame(codec_context, frame) < 0) {
-            fprintf(stderr, "receive frame");
+            fprintf(stderr, "receive frame\r\n");
             return -1;
         }
 
         holder = swr_convert(swr_context, &audio_buffer, samples, (const uint8_t**)&frame->data, frame->nb_samples);
         if (holder < 0) {
-            fprintf(stderr, "swrconvert not working");
+            fprintf(stderr, "swrconvert not working\r\n");
             return -1;
         }
 
         //printf("%i", holder);
 
          while (holder>0) {
-            pa_simple_write(s, audio_buffer, sizeof(audio_buffer), NULL);
+            //pa_simple_write(s, audio_buffer, sizeof(audio_buffer), NULL);
+            if (pa_simple_write(s, audio_buffer, sizeof(audio_buffer), NULL) < 0) {
+                fprintf(stderr, "pulse not playing\r\n");
+                return -1;
+            }
+
+            if (pa_simple_drain(s, NULL) < 0) {
+                fprintf(stderr, "pa_simpe_drain broke\r\n");
+                return -1;
+            }
 
             holder = swr_convert(swr_context, &audio_buffer, samples, NULL, 0);
             if (holder < 0) {
@@ -181,7 +191,28 @@ int play_with_libav(char *url) {
             }
          }
 
+         /*frame_out->channel_layout = AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT;
+         frame_out->format = AV_SAMPLE_FMT_FLT;
+         frame_out->sample_rate = (int)ss.rate;
+
+         if (swr_convert_frame(swr_context, frame_out, frame) < 0) {
+            fprintf(stderr, "swr broke\r\n");
+            return -1;
+         }
+
+         if (pa_simple_write(s, frame_out->data, sizeof(frame_out->data), NULL) < 0) {
+            fprintf(stderr, "pulse not playing\r\n");
+            return -1;
+         }
+
+         if (pa_simple_drain(s, NULL) < 0) {
+            fprintf(stderr, "pa_simpe_drain broke\r\n");
+            return -1;
+         }*/
+
+        //av_frame_unref(frame_out);
         av_packet_unref(&avpkt);
+        //frame_out = av_frame_alloc();
     }
 
 
