@@ -76,7 +76,11 @@ int play_with_libav(char *url) {
     int error;
     error = 0;
 
-    audio_buffer = malloc(441000 * sizeof(uint8_t));
+    audio_buffer = malloc((32 * 1024) * sizeof(uint8_t));
+    if (!audio_buffer) {
+        fprintf(stderr, "cant get memory for audio buffer\r\n");
+        return -1;
+    }
 
     //make a mainloop for pulse
     mainloop = pa_threaded_mainloop_new();
@@ -112,6 +116,7 @@ int play_with_libav(char *url) {
             fprintf(stderr, "context state is broke\r\n");
             return -1;
         }
+        printf("context state: %i\r\n", context_state);
         if (context_state == PA_CONTEXT_READY) break;
         pa_threaded_mainloop_wait(mainloop);
     }
@@ -226,12 +231,13 @@ int play_with_libav(char *url) {
     holder = 0;
 
     for (;;) {
-        pa_context_state_t context_state = pa_context_get_state(context_pa);
-        if (PA_CONTEXT_IS_GOOD(context_state) == 0) {
-            fprintf(stderr, "context state is broke\r\n");
+        pa_stream_state_t stream_state = pa_stream_get_state(stream_pa);
+        if (PA_CONTEXT_IS_GOOD(stream_state) == 0) {
+            fprintf(stderr, "stream state is broke\r\n");
             return -1;
         }
-        if (context_state == PA_CONTEXT_READY) break;
+        printf("stream state: %i\r\n", stream_state);
+        if (stream_state == PA_STREAM_READY) break;
         pa_threaded_mainloop_wait(mainloop);
     }
 
@@ -265,13 +271,13 @@ int play_with_libav(char *url) {
          while (holder>0) {
 
             for (;;) {
-                pa_context_state_t context_state = pa_context_get_state(context_pa);
-                if (PA_CONTEXT_IS_GOOD(context_state) == 0) {
-                    fprintf(stderr, "context state is broke\r\n");
+                pa_stream_state_t stream_state = pa_stream_get_state(stream_pa);
+                if (PA_CONTEXT_IS_GOOD(stream_state) == 0) {
+                    fprintf(stderr, "stream state is broke\r\n");
                     return -1;
                 }
-
-                if (context_state == PA_CONTEXT_READY) break;
+                printf("stream state = %i\r\n", stream_state);
+                if (stream_state == PA_STREAM_READY) break;
                 pa_threaded_mainloop_wait(mainloop);
             }
 
@@ -327,9 +333,9 @@ int play_with_libav(char *url) {
     return 0;
 }
 
-void context_state_cb(pa_context* context, void* userdata) {
+void context_state_cb(pa_context* context, void* mainloop) {
 
-    pa_context_state_t state;
+    /*pa_context_state_t state;
     int* pa_ready = userdata;
     state = pa_context_get_state(context);
     switch (state) {
@@ -346,10 +352,10 @@ void context_state_cb(pa_context* context, void* userdata) {
         case PA_CONTEXT_READY:
             *pa_ready = 1;
             break;
-    }
+    }*/
 
     //dont know what this does so will comment it out
-    //pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
+    pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
 }
 
 void stream_state_cb(pa_stream* stream, void* mainloop) {
