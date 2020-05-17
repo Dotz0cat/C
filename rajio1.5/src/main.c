@@ -76,7 +76,7 @@ int play_with_libav(char *url) {
     int error;
     error = 0;
 
-    audio_buffer = malloc(32*1024);
+    audio_buffer = malloc(441000 * sizeof(uint8_t));
 
     //make a mainloop for pulse
     mainloop = pa_threaded_mainloop_new();
@@ -138,8 +138,7 @@ int play_with_libav(char *url) {
     //copied from https://stackoverflow.com/questions/29977651/how-can-the-pulseaudio-asynchronous-library-be-used-to-play-raw-pcm-data
     pa_stream_flags_t stream_flags;
     stream_flags = PA_STREAM_START_CORKED | PA_STREAM_INTERPOLATE_TIMING |
-        PA_STREAM_NOT_MONOTONIC | PA_STREAM_AUTO_TIMING_UPDATE |
-        PA_STREAM_ADJUST_LATENCY;
+        PA_STREAM_NOT_MONOTONIC | PA_STREAM_AUTO_TIMING_UPDATE;
 
     if (pa_stream_connect_playback(stream_pa, NULL, &buffer_attr, stream_flags, NULL, NULL) != 0) {
         fprintf(stderr, "could not connect to playback stream\r\n");
@@ -278,9 +277,10 @@ int play_with_libav(char *url) {
 
             pa_threaded_mainloop_unlock(mainloop);
 
-            if ((error = pa_stream_write(stream_pa, audio_buffer, sizeof(audio_buffer), NULL, 0, PA_SEEK_RELATIVE)) != 0) {
+            if ((error = pa_stream_write(stream_pa, audio_buffer, sizeof(audio_buffer), NULL, 0LL, PA_SEEK_RELATIVE)) != 0) {
                 fprintf(stderr, "error writing to pa stream\r\n");
                 fprintf(stderr, "%s\r\n", pa_strerror(error));
+                fprintf(stderr, "%s\r\n", pa_strerror(pa_context_errno(context_pa)));
                 return -1;
             }
 
@@ -327,8 +327,29 @@ int play_with_libav(char *url) {
     return 0;
 }
 
-void context_state_cb(pa_context* context, void* mainloop) {
-    pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
+void context_state_cb(pa_context* context, void* userdata) {
+
+    pa_context_state_t state;
+    int* pa_ready = userdata;
+    state = pa_context_get_state(context);
+    switch (state) {
+        case PA_CONTEXT_UNCONNECTED:
+        case PA_CONTEXT_CONNECTING:
+        case PA_CONTEXT_AUTHORIZING:
+        case PA_CONTEXT_SETTING_NAME:
+        default:
+            break;
+        case PA_CONTEXT_FAILED:
+        case PA_CONTEXT_TERMINATED:
+            *pa_ready = 2;
+            break;
+        case PA_CONTEXT_READY:
+            *pa_ready = 1;
+            break;
+    }
+
+    //dont know what this does so will comment it out
+    //pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
 }
 
 void stream_state_cb(pa_stream* stream, void* mainloop) {
@@ -342,9 +363,8 @@ void stream_success_cb(pa_stream* stream, int success, void* userdata) {
 void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* userdata) {
     int bytes_left = (int)requested_bytes;
     while (bytes_left > 0) {
-        uint8_t* buffer;
-        size_t bytes_to_fill;
-        bytes_to_fill = 0;
+        uint8_t* buffer = NULL;
+        size_t bytes_to_fill = 44100;
         size_t i;
 
         if ((int)bytes_to_fill > bytes_left) bytes_to_fill = (size_t)bytes_left;
