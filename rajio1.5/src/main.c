@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
 
 void print_help() {
     printf("the proper way to use this program at the moment is with the syantax\r\n");
-    printf("rajio protocol:\\\\url:port\r\n");
+    printf("rajio protocol://url:port\r\n");
 }
 
 int play_with_libav(char *url) {
@@ -76,7 +76,7 @@ int play_with_libav(char *url) {
     int error;
     error = 0;
 
-    audio_buffer = malloc((32 * 1024) * sizeof(uint8_t));
+    audio_buffer = malloc((11520) * sizeof(uint8_t));
     if (!audio_buffer) {
         fprintf(stderr, "cant get memory for audio buffer\r\n");
         return -1;
@@ -137,13 +137,13 @@ int play_with_libav(char *url) {
     pa_buffer_attr buffer_attr;
     buffer_attr.maxlength = (uint32_t) -1;
     buffer_attr.tlength = (uint32_t) -1;
-    buffer_attr.prebuf = (uint32_t) -1;
+    buffer_attr.prebuf = (uint32_t) 0;
     buffer_attr.minreq = (uint32_t) -1;
 
     //copied from https://stackoverflow.com/questions/29977651/how-can-the-pulseaudio-asynchronous-library-be-used-to-play-raw-pcm-data
     pa_stream_flags_t stream_flags;
     stream_flags = PA_STREAM_START_CORKED | PA_STREAM_INTERPOLATE_TIMING |
-        PA_STREAM_NOT_MONOTONIC | PA_STREAM_AUTO_TIMING_UPDATE;
+        PA_STREAM_NOT_MONOTONIC | PA_STREAM_AUTO_TIMING_UPDATE | PA_STREAM_ADJUST_LATENCY;
 
     if (pa_stream_connect_playback(stream_pa, NULL, &buffer_attr, stream_flags, NULL, NULL) != 0) {
         fprintf(stderr, "could not connect to playback stream\r\n");
@@ -267,8 +267,12 @@ int play_with_libav(char *url) {
             return -1;
         }
 
+        printf("%i\r\n", frame->nb_samples);
+
 
          while (holder>0) {
+
+            pa_threaded_mainloop_wait(mainloop);
 
             for (;;) {
                 pa_stream_state_t stream_state = pa_stream_get_state(stream_pa);
@@ -276,14 +280,14 @@ int play_with_libav(char *url) {
                     fprintf(stderr, "stream state is broke\r\n");
                     return -1;
                 }
-                printf("stream state = %i\r\n", stream_state);
+                //printf("stream state = %i\r\n", stream_state);
                 if (stream_state == PA_STREAM_READY) break;
                 pa_threaded_mainloop_wait(mainloop);
             }
 
             pa_threaded_mainloop_unlock(mainloop);
 
-            if ((error = pa_stream_write(stream_pa, audio_buffer, sizeof(audio_buffer), NULL, 0LL, PA_SEEK_RELATIVE)) != 0) {
+            if ((error = pa_stream_write(stream_pa, audio_buffer, (11520), NULL, 0, PA_SEEK_RELATIVE)) != 0) {
                 fprintf(stderr, "error writing to pa stream\r\n");
                 fprintf(stderr, "%s\r\n", pa_strerror(error));
                 fprintf(stderr, "%s\r\n", pa_strerror(pa_context_errno(context_pa)));
@@ -366,9 +370,23 @@ void stream_success_cb(pa_stream* stream, int success, void* userdata) {
     return;
 }
 
-void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* userdata) {
-    int bytes_left = (int)requested_bytes;
+void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* mainloop) {
+
+    //printf("i am called the callback\r\n");
+
+    pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
+
+
+
+
+
+
+
+    /*int bytes_left = (int)requested_bytes;
+    //printf("%i\r\n", bytes_left);
+    printf(userdata);
     while (bytes_left > 0) {
+        printf("%i\r\n", bytes_left);
         uint8_t* buffer = NULL;
         size_t bytes_to_fill = 44100;
         size_t i;
@@ -382,8 +400,8 @@ void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* userdata) 
             buffer[i+1] = (i%100) * 40 / 100 + 44;
         }
 
-        pa_stream_write(stream, buffer, bytes_to_fill, NULL, 0LL, PA_SEEK_RELATIVE);
+        pa_stream_write(stream, buffer, bytes_to_fill, NULL, 0, PA_SEEK_RELATIVE);
 
         bytes_left -= bytes_to_fill;
-    }
+    }*/
 }
