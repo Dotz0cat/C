@@ -27,9 +27,11 @@ void context_state_cb(pa_context* context, void* mainloop);
 void stream_state_cb(pa_stream* stream, void* mainloop);
 void stream_success_cb(pa_stream* stream, int success, void* userdata);
 void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* userdata);
+void stream_underflow_cb(pa_stream* stream, void* mainloop);
 
 /*
     my useal test case is http://158.69.38.195:20278
+    http://184.75.223.178:8102
 */
 int main(int argc, char *argv[])
 {
@@ -133,6 +135,7 @@ int play_with_libav(char *url) {
     stream_pa = pa_stream_new(context_pa, "rajio", &sample_spec, &map);
     pa_stream_set_state_callback(stream_pa, &stream_state_cb, mainloop);
     pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
+    pa_stream_set_underflow_callback(stream_pa, &stream_underflow_cb, mainloop);
 
     pa_buffer_attr buffer_attr;
     buffer_attr.maxlength = (uint32_t) -1;
@@ -243,6 +246,13 @@ int play_with_libav(char *url) {
 
     //pa_threaded_mainloop_unlock(mainloop);
 
+    error = 0;
+
+    pa_usec_t user_spec = pa_bytes_to_usec((uint64_t) 11520, &sample_spec);
+
+    printf("latancy: %i\r\n", pa_stream_get_latency(stream_pa, &user_spec, &error));
+    printf("error: %i\r\n", error);
+
     pa_stream_cork(stream_pa, 0, &stream_success_cb, mainloop);
     //pa_threaded_mainloop_unlock(mainloop);
 
@@ -267,23 +277,13 @@ int play_with_libav(char *url) {
             return -1;
         }
 
-        printf("%i\r\n", frame->nb_samples);
+        //printf("%i\r\n", frame->nb_samples);
 
+        //pa_stream_trigger(stream_pa, stream_success_cb, mainloop);
 
          while (holder>0) {
 
             pa_threaded_mainloop_wait(mainloop);
-
-            for (;;) {
-                pa_stream_state_t stream_state = pa_stream_get_state(stream_pa);
-                if (PA_CONTEXT_IS_GOOD(stream_state) == 0) {
-                    fprintf(stderr, "stream state is broke\r\n");
-                    return -1;
-                }
-                //printf("stream state = %i\r\n", stream_state);
-                if (stream_state == PA_STREAM_READY) break;
-                pa_threaded_mainloop_wait(mainloop);
-            }
 
             pa_threaded_mainloop_unlock(mainloop);
 
@@ -294,7 +294,9 @@ int play_with_libav(char *url) {
                 return -1;
             }
 
-            pa_stream_drain(stream_pa, NULL, mainloop);
+            pa_threaded_mainloop_lock(mainloop);
+
+            //pa_stream_drain(stream_pa, NULL, mainloop);
 
             holder = swr_convert(swr_context, &audio_buffer, samples, NULL, 0);
             if (holder < 0) {
@@ -302,7 +304,7 @@ int play_with_libav(char *url) {
                 return -1;
             }
 
-            pa_threaded_mainloop_lock(mainloop);
+
 
          }
 
@@ -328,7 +330,11 @@ int play_with_libav(char *url) {
         //av_frame_unref(frame_out);
         av_packet_unref(&avpkt);
         //frame_out = av_frame_alloc();
+
+        //printf("first run after run: %i\r\n", first_run);
+
     }
+
 
 
     printf("going well add more\r\n");
@@ -375,33 +381,11 @@ void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* mainloop) 
     //printf("i am called the callback\r\n");
 
     pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
-
-
-
-
-
-
-
-    /*int bytes_left = (int)requested_bytes;
-    //printf("%i\r\n", bytes_left);
-    printf(userdata);
-    while (bytes_left > 0) {
-        printf("%i\r\n", bytes_left);
-        uint8_t* buffer = NULL;
-        size_t bytes_to_fill = 44100;
-        size_t i;
-
-        if ((int)bytes_to_fill > bytes_left) bytes_to_fill = (size_t)bytes_left;
-
-        pa_stream_begin_write(stream, (void**)&buffer, &bytes_to_fill);
-
-        for (i = 0; i < bytes_to_fill; i += 2) {
-            buffer[i] = (i%100) * 40 / 100 + 44;
-            buffer[i+1] = (i%100) * 40 / 100 + 44;
-        }
-
-        pa_stream_write(stream, buffer, bytes_to_fill, NULL, 0, PA_SEEK_RELATIVE);
-
-        bytes_left -= bytes_to_fill;
-    }*/
 }
+
+void stream_underflow_cb(pa_stream* stream, void* mainloop) {
+    //printf("underflow happended\r\n");
+    pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
+}
+
+
