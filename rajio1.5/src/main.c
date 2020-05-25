@@ -141,8 +141,8 @@ int play_with_libav(char *url) {
 
     pa_buffer_attr buffer_attr;
     buffer_attr.maxlength = (uint32_t) -1;
-    buffer_attr.tlength = (uint32_t) -1;
-    buffer_attr.prebuf = (uint32_t) -1;
+    buffer_attr.tlength = (uint32_t) 11520;
+    buffer_attr.prebuf = (uint32_t) 0;
     buffer_attr.minreq = (uint32_t) -1;
 
     //copied from https://stackoverflow.com/questions/29977651/how-can-the-pulseaudio-asynchronous-library-be-used-to-play-raw-pcm-data
@@ -163,11 +163,11 @@ int play_with_libav(char *url) {
 
 
     if ((holder = avformat_open_input(&format, url, NULL, NULL))!=0) {
-        fprintf(stderr, "avformat_open_input broke");
+        fprintf(stderr, "avformat_open_input broke\r\n");
         return holder;
     }
     if ((holder = avformat_find_stream_info(format, NULL))<0) {
-        fprintf(stderr, "find_stream_info broke");
+        fprintf(stderr, "find_stream_info broke\r\n");
         fprintf(stderr, "%i\r\n", holder);
         av_make_error_string(err, sizeof(err), holder);
         fprintf(stderr, "%s\r\n", err);
@@ -257,13 +257,13 @@ int play_with_libav(char *url) {
     printf("error: %i\r\n", error);
     printf("%zu\r\n", pa_bytes_per_second(&sample_spec));
 
-    //pa_stream_cork(stream_pa, 0, &stream_success_cb, mainloop);
+    pa_stream_cork(stream_pa, 0, &stream_success_cb, mainloop);
 
     /*frame_out->channel_layout = AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT;
     frame_out->format = AV_SAMPLE_FMT_FLT;
     frame_out->sample_rate = (int)sample_spec.rate;*/
 
-    int64_t runs = 1;
+    //int64_t runs = 1;
 
     while (av_read_frame(format, &avpkt) >= 0) {
         if (avpkt.stream_index != (int)stream) {
@@ -292,11 +292,11 @@ int play_with_libav(char *url) {
 
          while (holder>0) {
 
-            if (pa_stream_is_corked(stream_pa)==0) {
-                pa_threaded_mainloop_wait(mainloop);
-            }
+            //if (pa_stream_is_corked(stream_pa)==0) {
+                //pa_threaded_mainloop_wait(mainloop);
+            //}
 
-            //pa_threaded_mainloop_wait(mainloop);
+            pa_threaded_mainloop_wait(mainloop);
 
             pa_threaded_mainloop_unlock(mainloop);
 
@@ -338,15 +338,18 @@ int play_with_libav(char *url) {
 
         pa_threaded_mainloop_lock(mainloop);*/
 
-        if (pa_stream_is_corked(stream_pa)==1) {
+        /*if (pa_stream_is_corked(stream_pa)==1) {
             runs += 1;
         }
 
-        printf("%li\r\n", runs);
+        //printf("%li\r\n", runs);
 
         if ((runs%62)==0) {
-            pa_stream_cork(stream_pa, 0, &stream_success_cb, mainloop);
-        }
+            if (pa_stream_is_corked(stream_pa)==1) {
+                pa_stream_cork(stream_pa, 0, &stream_success_cb, mainloop);
+            }
+
+        }*/
 
         av_packet_unref(&avpkt);
     }
@@ -402,12 +405,12 @@ void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* mainloop) 
 void stream_underflow_cb(pa_stream* stream, void* mainloop) {
     printf("underflow\r\n");
     //pa_threaded_mainloop_lock(mainloop);
-    pa_stream_cork(stream, 1, &stream_success_cb, mainloop);
+    //pa_stream_cork(stream, 1, &stream_success_cb, mainloop);
     //pa_threaded_mainloop_unlock(mainloop);
 }
 
 void stream_overflow_cb(pa_stream* stream, void* mainloop) {
     printf("overflow\r\n");
-    pa_stream_trigger(stream, &stream_success_cb, mainloop);
+    //pa_stream_trigger(stream, &stream_success_cb, mainloop);
 }
 
