@@ -140,15 +140,15 @@ int play_with_libav(char *url) {
     pa_stream_set_overflow_callback(stream_pa, &stream_overflow_cb, mainloop);
 
     pa_buffer_attr buffer_attr;
-    buffer_attr.maxlength = (uint32_t) -1;
-    buffer_attr.tlength = (uint32_t) 11520;
+    buffer_attr.maxlength = (uint32_t) -1; //pa_usec_to_bytes(20000, &sample_spec) * 10;
+    buffer_attr.tlength = (uint32_t) pa_usec_to_bytes(10000, &sample_spec);
+    printf("%zu\r\n", pa_usec_to_bytes(10000, &sample_spec));
     buffer_attr.prebuf = (uint32_t) 0;
-    buffer_attr.minreq = (uint32_t) -1;
+    buffer_attr.minreq = (uint32_t) pa_usec_to_bytes(0, &sample_spec);
 
     //copied from https://stackoverflow.com/questions/29977651/how-can-the-pulseaudio-asynchronous-library-be-used-to-play-raw-pcm-data
     pa_stream_flags_t stream_flags;
-    stream_flags = PA_STREAM_START_CORKED | PA_STREAM_INTERPOLATE_TIMING |
-        PA_STREAM_NOT_MONOTONIC | PA_STREAM_AUTO_TIMING_UPDATE | PA_STREAM_ADJUST_LATENCY;
+    stream_flags = PA_STREAM_START_CORKED | PA_STREAM_INTERPOLATE_TIMING | PA_STREAM_AUTO_TIMING_UPDATE | PA_STREAM_ADJUST_LATENCY;
 
     if (pa_stream_connect_playback(stream_pa, NULL, &buffer_attr, stream_flags, NULL, NULL) != 0) {
         fprintf(stderr, "could not connect to playback stream\r\n");
@@ -250,10 +250,11 @@ int play_with_libav(char *url) {
 
     error = 0;
 
-    pa_usec_t user_spec = pa_bytes_to_usec((uint64_t) 11520, &sample_spec);
+    pa_usec_t user_spec; // = pa_bytes_to_usec((uint64_t) 11520, &sample_spec);
 
-    printf("%lu\r\n", user_spec);
+
     printf("latancy: %i\r\n", pa_stream_get_latency(stream_pa, &user_spec, &error));
+    printf("%lu\r\n", user_spec);
     printf("error: %i\r\n", error);
     printf("%zu\r\n", pa_bytes_per_second(&sample_spec));
 
