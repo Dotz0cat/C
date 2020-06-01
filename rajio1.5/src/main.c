@@ -79,7 +79,7 @@ int play_with_libav(char *url) {
     int error;
     error = 0;
 
-    audio_buffer = malloc((11520) * sizeof(uint8_t));
+    audio_buffer = malloc((10 * 1152) * sizeof(uint8_t));
     if (!audio_buffer) {
         fprintf(stderr, "cant get memory for audio buffer\r\n");
         return -1;
@@ -301,7 +301,7 @@ int play_with_libav(char *url) {
 
             pa_threaded_mainloop_unlock(mainloop);
 
-            if ((error = pa_stream_write(stream_pa, audio_buffer, (11520), NULL, 0, PA_SEEK_RELATIVE)) != 0) {
+            if ((error = pa_stream_write(stream_pa, audio_buffer, (10*1152), NULL, 0, PA_SEEK_RELATIVE)) != 0) {
                 fprintf(stderr, "error writing to pa stream\r\n");
                 fprintf(stderr, "%s\r\n", pa_strerror(error));
                 fprintf(stderr, "%s\r\n", pa_strerror(pa_context_errno(context_pa)));
