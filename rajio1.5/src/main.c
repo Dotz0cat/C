@@ -18,6 +18,8 @@
 #include <libavutil/error.h>
 #include <libswresample/swresample.h>
 
+#define buffer_size_macro 8
+
 
 void print_help(void);
 int play_with_libav(char *url);
@@ -79,7 +81,7 @@ int play_with_libav(char *url) {
     int error;
     error = 0;
 
-    audio_buffer = malloc((10 * 1152) * sizeof(uint8_t));
+    audio_buffer = malloc((buffer_size_macro * 1152) * sizeof(uint8_t));
     if (!audio_buffer) {
         fprintf(stderr, "cant get memory for audio buffer\r\n");
         return -1;
@@ -135,16 +137,16 @@ int play_with_libav(char *url) {
 
     stream_pa = pa_stream_new(context_pa, "rajio", &sample_spec, &map);
     pa_stream_set_state_callback(stream_pa, &stream_state_cb, mainloop);
-    pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
+    //pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
     pa_stream_set_underflow_callback(stream_pa, &stream_underflow_cb, mainloop);
     pa_stream_set_overflow_callback(stream_pa, &stream_overflow_cb, mainloop);
 
     pa_buffer_attr buffer_attr;
     buffer_attr.maxlength = (uint32_t) -1; //pa_usec_to_bytes(20000, &sample_spec) * 10;
-    buffer_attr.tlength = (uint32_t) pa_usec_to_bytes(10000, &sample_spec);
-    printf("%zu\r\n", pa_usec_to_bytes(10000, &sample_spec));
-    buffer_attr.prebuf = (uint32_t) 0;
-    buffer_attr.minreq = (uint32_t) pa_usec_to_bytes(0, &sample_spec);
+    buffer_attr.tlength = (uint32_t) -1; //buffer_size_macro * 1152;
+    //printf("%zu\r\n", pa_usec_to_bytes(10000, &sample_spec));
+    buffer_attr.prebuf = (uint32_t) -1;
+    buffer_attr.minreq = (uint32_t) buffer_size_macro * 1152;
 
     //copied from https://stackoverflow.com/questions/29977651/how-can-the-pulseaudio-asynchronous-library-be-used-to-play-raw-pcm-data
     pa_stream_flags_t stream_flags;
@@ -154,6 +156,8 @@ int play_with_libav(char *url) {
         fprintf(stderr, "could not connect to playback stream\r\n");
         return -1;
     }
+
+    pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
 
     //libav stuff
     avformat_network_init();
@@ -246,6 +250,8 @@ int play_with_libav(char *url) {
         pa_threaded_mainloop_wait(mainloop);
     }
 
+    //pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
+
     //pa_threaded_mainloop_unlock(mainloop);
 
     error = 0;
@@ -265,6 +271,10 @@ int play_with_libav(char *url) {
     frame_out->sample_rate = (int)sample_spec.rate;*/
 
     //int64_t runs = 1;
+
+    size_t size_thing = buffer_size_macro * 1152;
+
+    //pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
 
     while (av_read_frame(format, &avpkt) >= 0) {
         if (avpkt.stream_index != (int)stream) {
@@ -297,11 +307,21 @@ int play_with_libav(char *url) {
                 //pa_threaded_mainloop_wait(mainloop);
             //}
 
-            pa_threaded_mainloop_wait(mainloop);
+            //printf("pa_")
+
+            if (pa_stream_begin_write(stream_pa, (void**) &audio_buffer, &size_thing) < 0) {
+                fprintf(stderr, "pa_begin_write failed: %s", pa_strerror(pa_context_errno(context_pa)));
+                return -1;
+            }
+
+            //pa_threaded_mainloop_signal(mainloop, 0);
+
+            pa_threaded_mainloop_accept(mainloop);
+            //pa_threaded_mainloop_wait(mainloop);
 
             pa_threaded_mainloop_unlock(mainloop);
 
-            if ((error = pa_stream_write(stream_pa, audio_buffer, (10*1152), NULL, 0, PA_SEEK_RELATIVE)) != 0) {
+            if ((error = pa_stream_write(stream_pa, audio_buffer, (buffer_size_macro*1152), NULL, 0, PA_SEEK_RELATIVE)) != 0) {
                 fprintf(stderr, "error writing to pa stream\r\n");
                 fprintf(stderr, "%s\r\n", pa_strerror(error));
                 fprintf(stderr, "%s\r\n", pa_strerror(pa_context_errno(context_pa)));
@@ -398,9 +418,26 @@ void stream_success_cb(pa_stream* stream, int success, void* userdata) {
 
 void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* mainloop) {
 
-    //printf("i am called the callback\r\n");
+    for (;;) {
+        pa_stream_state_t stream_state = pa_stream_get_state(stream);
+        if (PA_CONTEXT_IS_GOOD(stream_state) == 0) {
+            fprintf(stderr, "stream state is broke\r\n");
+            //return -1;
+        }
+        printf("stream state: %i\r\n", stream_state);
+        if (stream_state == PA_STREAM_READY) break;
+        pa_threaded_mainloop_wait(mainloop);
+    }
 
-    pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
+    printf("i am called the callback\r\n");
+    printf("bytes requested: %zu\r\n", requested_bytes);
+
+    //pa_threaded_mainloop_wait(mainloop);
+
+    pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 1);
+
+    //pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
+    //return;
 }
 
 void stream_underflow_cb(pa_stream* stream, void* mainloop) {
