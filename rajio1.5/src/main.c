@@ -17,6 +17,7 @@
 #include <libavformat/avformat.h>
 #include <libavutil/error.h>
 #include <libswresample/swresample.h>
+#include <time.h>
 
 #define buffer_size_macro 8
 
@@ -121,7 +122,7 @@ int play_with_libav(char *url) {
             fprintf(stderr, "context state is broke\r\n");
             return -1;
         }
-        printf("context state: %i\r\n", context_state);
+        //printf("context state: %i\r\n", context_state);
         if (context_state == PA_CONTEXT_READY) break;
         pa_threaded_mainloop_wait(mainloop);
     }
@@ -137,7 +138,7 @@ int play_with_libav(char *url) {
 
     stream_pa = pa_stream_new(context_pa, "rajio", &sample_spec, &map);
     pa_stream_set_state_callback(stream_pa, &stream_state_cb, mainloop);
-    //pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
+    pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
     pa_stream_set_underflow_callback(stream_pa, &stream_underflow_cb, mainloop);
     pa_stream_set_overflow_callback(stream_pa, &stream_overflow_cb, mainloop);
 
@@ -146,7 +147,7 @@ int play_with_libav(char *url) {
     buffer_attr.tlength = (uint32_t) -1; //buffer_size_macro * 1152;
     //printf("%zu\r\n", pa_usec_to_bytes(10000, &sample_spec));
     buffer_attr.prebuf = (uint32_t) -1;
-    buffer_attr.minreq = (uint32_t) buffer_size_macro * 1152;
+    buffer_attr.minreq = (uint32_t) -1; // buffer_size_macro * 1152;
 
     //copied from https://stackoverflow.com/questions/29977651/how-can-the-pulseaudio-asynchronous-library-be-used-to-play-raw-pcm-data
     pa_stream_flags_t stream_flags;
@@ -156,8 +157,6 @@ int play_with_libav(char *url) {
         fprintf(stderr, "could not connect to playback stream\r\n");
         return -1;
     }
-
-    pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
 
     //libav stuff
     avformat_network_init();
@@ -235,7 +234,6 @@ int play_with_libav(char *url) {
     avpkt.size = 0;
 
     AVFrame* frame = av_frame_alloc();
-    //AVFrame* frame_out = av_frame_alloc();
 
     holder = 0;
 
@@ -245,36 +243,18 @@ int play_with_libav(char *url) {
             fprintf(stderr, "stream state is broke\r\n");
             return -1;
         }
-        printf("stream state: %i\r\n", stream_state);
+        //printf("stream state: %i\r\n", stream_state);
         if (stream_state == PA_STREAM_READY) break;
         pa_threaded_mainloop_wait(mainloop);
     }
 
-    //pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
-
-    //pa_threaded_mainloop_unlock(mainloop);
-
     error = 0;
-
-    pa_usec_t user_spec; // = pa_bytes_to_usec((uint64_t) 11520, &sample_spec);
-
-
-    printf("latancy: %i\r\n", pa_stream_get_latency(stream_pa, &user_spec, &error));
-    printf("%lu\r\n", user_spec);
-    printf("error: %i\r\n", error);
-    printf("%zu\r\n", pa_bytes_per_second(&sample_spec));
 
     pa_stream_cork(stream_pa, 0, &stream_success_cb, mainloop);
 
-    /*frame_out->channel_layout = AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT;
-    frame_out->format = AV_SAMPLE_FMT_FLT;
-    frame_out->sample_rate = (int)sample_spec.rate;*/
-
-    //int64_t runs = 1;
-
     size_t size_thing = buffer_size_macro * 1152;
 
-    //pa_stream_set_write_callback(stream_pa, &stream_write_cb, mainloop);
+    pa_threaded_mainloop_unlock(mainloop);
 
     while (av_read_frame(format, &avpkt) >= 0) {
         if (avpkt.stream_index != (int)stream) {
@@ -303,74 +283,30 @@ int play_with_libav(char *url) {
 
          while (holder>0) {
 
-            //if (pa_stream_is_corked(stream_pa)==0) {
-                //pa_threaded_mainloop_wait(mainloop);
-            //}
+            if (pa_stream_writable_size(stream_pa) > buffer_size_macro * 1152) {
 
-            //printf("pa_")
+                if (pa_stream_begin_write(stream_pa, (void**) &audio_buffer, &size_thing) < 0) {
+                    fprintf(stderr, "pa_begin_write failed: %s\r\n", pa_strerror(pa_context_errno(context_pa)));
+                    return -1;
+                }
 
-            if (pa_stream_begin_write(stream_pa, (void**) &audio_buffer, &size_thing) < 0) {
-                fprintf(stderr, "pa_begin_write failed: %s", pa_strerror(pa_context_errno(context_pa)));
-                return -1;
+                if ((error = pa_stream_write(stream_pa, audio_buffer, (buffer_size_macro*1152), NULL, 0, PA_SEEK_RELATIVE)) != 0) {
+                    fprintf(stderr, "error writing to pa stream\r\n");
+                    fprintf(stderr, "%s\r\n", pa_strerror(error));
+                    fprintf(stderr, "%s\r\n", pa_strerror(pa_context_errno(context_pa)));
+                    return -1;
+                }
+
+                holder = swr_convert(swr_context, &audio_buffer, samples, NULL, 0);
+                if (holder < 0) {
+                    fprintf(stderr, "swr convert on line 174");
+                    return -1;
+                }
+
             }
 
-            //pa_threaded_mainloop_signal(mainloop, 0);
-
-            pa_threaded_mainloop_accept(mainloop);
-            //pa_threaded_mainloop_wait(mainloop);
-
-            pa_threaded_mainloop_unlock(mainloop);
-
-            if ((error = pa_stream_write(stream_pa, audio_buffer, (buffer_size_macro*1152), NULL, 0, PA_SEEK_RELATIVE)) != 0) {
-                fprintf(stderr, "error writing to pa stream\r\n");
-                fprintf(stderr, "%s\r\n", pa_strerror(error));
-                fprintf(stderr, "%s\r\n", pa_strerror(pa_context_errno(context_pa)));
-                return -1;
-            }
-
-            pa_threaded_mainloop_lock(mainloop);
-
-            //pa_stream_drain(stream_pa, NULL, mainloop);
-
-            holder = swr_convert(swr_context, &audio_buffer, samples, NULL, 0);
-            if (holder < 0) {
-                fprintf(stderr, "swr convert on line 174");
-                return -1;
-            }
          }
 
-
-
-         /*if (swr_convert_frame(swr_context, frame_out, frame) < 0) {
-            fprintf(stderr, "swr broke\r\n");
-            return -1;
-         }
-
-         pa_threaded_mainloop_wait(mainloop);
-
-         pa_threaded_mainloop_unlock(mainloop);
-
-         if ((error = pa_stream_write(stream_pa, frame_out->data, sizeof(frame_out->data), NULL, 0, PA_SEEK_RELATIVE)) != 0) {
-                fprintf(stderr, "error writing to pa stream\r\n");
-                fprintf(stderr, "%s\r\n", pa_strerror(error));
-                fprintf(stderr, "%s\r\n", pa_strerror(pa_context_errno(context_pa)));
-                return -1;
-        }
-
-        pa_threaded_mainloop_lock(mainloop);*/
-
-        /*if (pa_stream_is_corked(stream_pa)==1) {
-            runs += 1;
-        }
-
-        //printf("%li\r\n", runs);
-
-        if ((runs%62)==0) {
-            if (pa_stream_is_corked(stream_pa)==1) {
-                pa_stream_cork(stream_pa, 0, &stream_success_cb, mainloop);
-            }
-
-        }*/
 
         av_packet_unref(&avpkt);
     }
@@ -384,27 +320,6 @@ int play_with_libav(char *url) {
 }
 
 void context_state_cb(pa_context* context, void* mainloop) {
-
-    /*pa_context_state_t state;
-    int* pa_ready = userdata;
-    state = pa_context_get_state(context);
-    switch (state) {
-        case PA_CONTEXT_UNCONNECTED:
-        case PA_CONTEXT_CONNECTING:
-        case PA_CONTEXT_AUTHORIZING:
-        case PA_CONTEXT_SETTING_NAME:
-        default:
-            break;
-        case PA_CONTEXT_FAILED:
-        case PA_CONTEXT_TERMINATED:
-            *pa_ready = 2;
-            break;
-        case PA_CONTEXT_READY:
-            *pa_ready = 1;
-            break;
-    }*/
-
-    //dont know what this does so will comment it out
     pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
 }
 
@@ -418,7 +333,7 @@ void stream_success_cb(pa_stream* stream, int success, void* userdata) {
 
 void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* mainloop) {
 
-    for (;;) {
+    /*for (;;) {
         pa_stream_state_t stream_state = pa_stream_get_state(stream);
         if (PA_CONTEXT_IS_GOOD(stream_state) == 0) {
             fprintf(stderr, "stream state is broke\r\n");
@@ -427,17 +342,17 @@ void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* mainloop) 
         printf("stream state: %i\r\n", stream_state);
         if (stream_state == PA_STREAM_READY) break;
         pa_threaded_mainloop_wait(mainloop);
-    }
+    }*/
 
-    printf("i am called the callback\r\n");
-    printf("bytes requested: %zu\r\n", requested_bytes);
+    //printf("i am called the callback\r\n");
+    //printf("bytes requested: %zu\r\n", requested_bytes);
 
     //pa_threaded_mainloop_wait(mainloop);
 
-    pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 1);
+    //pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 1);
 
     //pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
-    //return;
+    return;
 }
 
 void stream_underflow_cb(pa_stream* stream, void* mainloop) {
