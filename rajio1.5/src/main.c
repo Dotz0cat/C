@@ -1,23 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <fnmatch.h>
-#include <arpa/inet.h>
-//#include <AL/al.h>
-//#include <AL/alc.h>
-#include <pulse/simple.h>
 #include <pulse/pulseaudio.h>
-#include <signal.h>
 #include <string.h>
 #include <libavutil/opt.h>
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/error.h>
 #include <libswresample/swresample.h>
-#include <time.h>
+
 
 #define buffer_size_macro 8
 
@@ -129,7 +120,7 @@ int play_with_libav(char *url) {
 
     //make the playback stream
     pa_sample_spec sample_spec;
-    sample_spec.format = PA_SAMPLE_FLOAT32LE;
+    sample_spec.format = PA_SAMPLE_S32LE;
     sample_spec.rate = 44100;
     sample_spec.channels = 2;
 
@@ -221,7 +212,7 @@ int play_with_libav(char *url) {
 
 
 
-    SwrContext* swr_context = swr_alloc_set_opts(NULL, AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT, AV_SAMPLE_FMT_FLT, (int)sample_spec.rate, (long)codec_context->channel_layout, codec_context->sample_fmt, codec_context->sample_rate, 0, NULL);
+    SwrContext* swr_context = swr_alloc_set_opts(NULL, AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT, AV_SAMPLE_FMT_S32, (int)sample_spec.rate, (long)codec_context->channel_layout, codec_context->sample_fmt, codec_context->sample_rate, 0, NULL);
     if (!swr_context) {
         fprintf(stderr, "swr context broke\r\n");
         return -1;
@@ -283,7 +274,11 @@ int play_with_libav(char *url) {
 
          while (holder>0) {
 
-            if (pa_stream_writable_size(stream_pa) > buffer_size_macro * 1152) {
+            pa_threaded_mainloop_wait(mainloop);
+
+            if (pa_stream_writable_size(stream_pa) >= buffer_size_macro * 1152) {
+
+
 
                 if (pa_stream_begin_write(stream_pa, (void**) &audio_buffer, &size_thing) < 0) {
                     fprintf(stderr, "pa_begin_write failed: %s\r\n", pa_strerror(pa_context_errno(context_pa)));
@@ -351,7 +346,11 @@ void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* mainloop) 
 
     //pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 1);
 
-    //pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
+    if (requested_bytes >= buffer_size_macro* 1152) {
+        pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
+    }
+
+
     return;
 }
 
