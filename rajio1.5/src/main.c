@@ -11,6 +11,8 @@
 
 
 #define buffer_size_macro 8
+#define pa_fmt PA_SAMPLE_S32LE
+#define av_fmt AV_SAMPLE_FMT_S32
 
 
 void print_help(void);
@@ -120,7 +122,7 @@ int play_with_libav(char *url) {
 
     //make the playback stream
     pa_sample_spec sample_spec;
-    sample_spec.format = PA_SAMPLE_S32LE;
+    sample_spec.format = pa_fmt;
     sample_spec.rate = 44100;
     sample_spec.channels = 2;
 
@@ -212,7 +214,7 @@ int play_with_libav(char *url) {
 
 
 
-    SwrContext* swr_context = swr_alloc_set_opts(NULL, AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT, AV_SAMPLE_FMT_S32, (int)sample_spec.rate, (long)codec_context->channel_layout, codec_context->sample_fmt, codec_context->sample_rate, 0, NULL);
+    SwrContext* swr_context = swr_alloc_set_opts(NULL, AV_CH_FRONT_LEFT | AV_CH_FRONT_RIGHT, av_fmt, (int)sample_spec.rate, (long)codec_context->channel_layout, codec_context->sample_fmt, codec_context->sample_rate, 0, NULL);
     if (!swr_context) {
         fprintf(stderr, "swr context broke\r\n");
         return -1;
@@ -267,10 +269,6 @@ int play_with_libav(char *url) {
             fprintf(stderr, "swrconvert not working\r\n");
             return -1;
         }
-
-        //printf("%i\r\n", frame->nb_samples);
-
-        //pa_stream_trigger(stream_pa, stream_success_cb, mainloop);
 
          while (holder>0) {
 
@@ -328,28 +326,9 @@ void stream_success_cb(pa_stream* stream, int success, void* userdata) {
 
 void stream_write_cb(pa_stream* stream, size_t requested_bytes, void* mainloop) {
 
-    /*for (;;) {
-        pa_stream_state_t stream_state = pa_stream_get_state(stream);
-        if (PA_CONTEXT_IS_GOOD(stream_state) == 0) {
-            fprintf(stderr, "stream state is broke\r\n");
-            //return -1;
-        }
-        printf("stream state: %i\r\n", stream_state);
-        if (stream_state == PA_STREAM_READY) break;
-        pa_threaded_mainloop_wait(mainloop);
-    }*/
-
-    //printf("i am called the callback\r\n");
-    //printf("bytes requested: %zu\r\n", requested_bytes);
-
-    //pa_threaded_mainloop_wait(mainloop);
-
-    //pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 1);
-
     if (requested_bytes >= buffer_size_macro* 1152) {
         pa_threaded_mainloop_signal((pa_threaded_mainloop*)mainloop, 0);
     }
-
 
     return;
 }
