@@ -9,10 +9,12 @@
 #include <libavutil/error.h>
 #include <libswresample/swresample.h>
 
+#include <unistd.h>
+
 
 #define buffer_size_macro 8
-#define pa_fmt PA_SAMPLE_S32LE
-#define av_fmt AV_SAMPLE_FMT_S32
+#define pa_fmt PA_SAMPLE_FLOAT32LE
+#define av_fmt AV_SAMPLE_FMT_FLT
 
 
 void print_help(void);
@@ -232,7 +234,7 @@ int play_with_libav(char *url) {
 
     for (;;) {
         pa_stream_state_t stream_state = pa_stream_get_state(stream_pa);
-        if (PA_CONTEXT_IS_GOOD(stream_state) == 0) {
+        if (PA_STREAM_IS_GOOD(stream_state) == 0) {
             fprintf(stderr, "stream state is broke\r\n");
             return -1;
         }
@@ -248,6 +250,9 @@ int play_with_libav(char *url) {
     size_t size_thing = buffer_size_macro * 1152;
 
     pa_threaded_mainloop_unlock(mainloop);
+
+    //int64_t waits = 0;
+    //int64_t writes = 0;
 
     while (av_read_frame(format, &avpkt) >= 0) {
         if (avpkt.stream_index != (int)stream) {
@@ -272,11 +277,13 @@ int play_with_libav(char *url) {
 
          while (holder>0) {
 
+            usleep(500);
+
             pa_threaded_mainloop_wait(mainloop);
 
+            //waits++;
+
             if (pa_stream_writable_size(stream_pa) >= buffer_size_macro * 1152) {
-
-
 
                 if (pa_stream_begin_write(stream_pa, (void**) &audio_buffer, &size_thing) < 0) {
                     fprintf(stderr, "pa_begin_write failed: %s\r\n", pa_strerror(pa_context_errno(context_pa)));
@@ -290,6 +297,8 @@ int play_with_libav(char *url) {
                     return -1;
                 }
 
+                //writes++;
+
                 holder = swr_convert(swr_context, &audio_buffer, samples, NULL, 0);
                 if (holder < 0) {
                     fprintf(stderr, "swr convert on line 174");
@@ -300,13 +309,34 @@ int play_with_libav(char *url) {
 
          }
 
+         /*printf("waits: %li\r\n", waits);
+         printf("writes: %li\r\n", writes);
+
+         printf("hit/miss ratio: %li\r\n", waits / writes);*/
+
 
         av_packet_unref(&avpkt);
     }
 
+    //empty everything
+    //pa_threaded_mainloop_lock(mainloop);
+    //pa_stream_drain(stream_pa, stream_success_cb, mainloop);
 
-
-    printf("going well add more\r\n");
+    //memory cleaning
+    av_frame_free(&frame);
+    swr_close(swr_context);
+    swr_free(&swr_context);
+    avcodec_close(codec_context);
+    avcodec_free_context(&codec_context);
+    //avcodec_parameters_free(&codec_prams);
+    avformat_close_input(&format);
+    avformat_free_context(format);
+    pa_threaded_mainloop_stop(mainloop);
+    pa_stream_disconnect(stream_pa);
+    pa_stream_unref(stream_pa);
+    pa_context_disconnect(context_pa);
+    pa_context_unref(context_pa);
+    pa_threaded_mainloop_free(mainloop);
 
     free(audio_buffer);
     return 0;
