@@ -1,15 +1,5 @@
-#include <stdlib.h>
+#include "rajio.h"
 #include <gtk/gtk.h>
-
-//i need to learn how to make headers
-struct station {
-    int station_number;
-    char station_name[100];
-    char thumbnail[400];
-    int num_of_addresses;
-    char address[400];
-    char secondary_address[400];
-};
 
 //prototypes
 void add_station(GtkWidget* flowbox, char* station_name, char* image_file);
@@ -40,11 +30,11 @@ int main(int argc, char* argv[]) {
 
     //get the max number of stations in file
     //this is done by deviding the number of bytes in the file by the size of the stuct that is stored in the file
-    max_stations = sizeof(struct station) / eof;
+    max_stations = sizeof(struct station) / (unsigned long) eof;
 
     struct station read;
 
-    for (station_number=0; station_number < max_stations;) {
+    for (station_number=0; (float) station_number < max_stations;) {
             read = read_file("/home/seth/c/C/rajio_gtk/stations", station_number, eof);
             add_station(flow, read.station_name, read.thumbnail);
     }
