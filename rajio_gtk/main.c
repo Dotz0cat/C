@@ -3,8 +3,7 @@
 
 //prototypes
 void add_station(GtkWidget* flowbox, char* station_name, char* image_file);
-extern struct station read_file(char* file_name, int station_number, long eof);
-extern long eof_finder(char* file_name);
+
 
 int station_number;
 
@@ -23,21 +22,6 @@ int main(int argc, char* argv[]) {
 
     //station_number = 0;
     //add_station(flow, "j sakura", "/home/seth/c/C/rajio_gtk/imgs/jsakura2016_thumb.jpg");
-
-    float max_stations;
-
-    long eof = eof_finder("/home/seth/c/C/rajio_gtk/stations");
-
-    //get the max number of stations in file
-    //this is done by deviding the number of bytes in the file by the size of the stuct that is stored in the file
-    max_stations = sizeof(struct station) / (unsigned long) eof;
-
-    struct station read;
-
-    for (station_number=0; (float) station_number < max_stations;) {
-            read = read_file("/home/seth/c/C/rajio_gtk/stations", station_number, eof);
-            add_station(flow, read.station_name, read.thumbnail);
-    }
 
     gtk_widget_show_all(window);
     gtk_main();

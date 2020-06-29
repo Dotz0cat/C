@@ -1,86 +1,102 @@
 #include "rajio.h"
 
 //prototypes 
-bson_t* read_file(char* file_name, int station_number);
-int append_new_station(char* file_name, bson_t* doc, int number);
-int write_to_file(char* file_name, bson_t* doc);
+int append_new_station(char* file_name, int id, char* name, char* thumbnail, int num_of_addresses);
+int append_new_address(char* file_name, int id, char* address);
 
+int append_new_station(char* file_name, int id, char* name, char* thumbnail, int num_of_addresses) {
+	sqlite3* db;
+	sqlite3_stmt* stmt;
 
-bson_t* read_file(char* file_name, int station_number) {
-	bson_t* parent;
-	bson_t* doc;
+	int rc = sqlite3_open(file_name, &db);
 
-	bson_reader_t* reader;
-	reader = bson_reader_new_from_file(file_name, NULL);
+	if (rc != SQLITE_OK) {
+		fprintf(stderr, "cannot open %s\r\n", file_name);
 
-	if (!reader) {
-		fprintf(stderr, "there was a error opening the bson reader");
-	}
+		sqlite3_close(db);
 
-	parent = bson_reader_read(reader, NULL);
-
-	if (station_number == 0) {
-		bson_reader_destroy(reader);
-		return parent;
-	}
-
-	bson_iter_t* iter;
-
-	char str[100];
-
-	uint8_t* buffer;
-
-	uint32_t* size;
-
-	sprintf(str, "%i", station_number);
-
-	if (bson_iter_init(iter, doc)) {
-		if (strcmp(bson_iter_key(iter), str)) {
-			bson_iter_document(iter, size, &buffer);
-			doc = bson_new_from_buffer(&buffer, (unsigned long*) size, NULL, NULL);
-			bson_reader_destroy(reader);
-			return doc;
-		}
-		while (bson_iter_next(iter)) {
-			if (strcmp(bson_iter_key(iter), str)) {
-			bson_iter_document(iter, size, &buffer);
-			doc = bson_new_from_buffer(&buffer, (unsigned long*) size, NULL, NULL);
-			break;
-			}
-		}
-	}
-
-	bson_reader_destroy(reader);
-	return doc;
-}
-
-int append_new_station(char* file_name, bson_t* doc, int number) {
-	bson_t* parent = read_file(file_name, 0);
-
-	char str[100];
-
-	sprintf(str, "%i", number);
-
-	bson_append_document(parent, str, -1, doc);
-
-	if (write_to_file(file_name, parent) < 0) {
 		return -1;
 	}
+
+	char* sql = "INSERT INTO Stations VALUES(Id=?, Name=?, Thumbnail=?, Num_of_addresses=?);";
+
+	rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+
+	if (rc == SQLITE_OK) {
+		sqlite3_bind_int(stmt, 1, id);
+		sqlite3_bind_text(stmt, 2, name, -1, NULL);
+		sqlite3_bind_text(stmt, 3, thumbnail, -1, NULL);
+		sqlite3_bind_int(stmt, 4, num_of_addresses);
+	}
+	else {
+		//think of a good error message
+
+		sqlite3_close(db);
+
+		return -1;
+	}
+
+	rc = sqlite3_step(stmt);
+
+	/*if (rc != SQLITE_DONE) {
+		//think of good error message
+
+		sqlite3_close(db);
+
+		return -1;
+	}*/
+
+	sqlite3_finalize(stmt);
+
+	sqlite3_close(db);
 
 	return 0;
 }
 
-int write_to_file(char* file_name, bson_t* doc) {
-	FILE* fp = fopen(file_name, "wb");
+int append_new_address(char* file_name, int id, char* address) {
+	sqlite3* db;
 
-	if (!fp) {
-		fprintf(stderr, "Threre was a error opening: %s\r\n", file_name);
+	sqlite3_stmt* stmt;
+
+	int rc = sqlite3_open(file_name, &db);
+
+	if (rc != SQLITE_OK) {
+		fprintf(stderr, "cannot open %s\r\n", file_name);
+
+		sqlite3_close(db);
+
 		return -1;
 	}
 
-	fwrite(doc, sizeof(doc), 1, fp);
+	char* sql = "INSERT INTO Adresses VALUES(Id=?, Address=?);";
 
-	fclose(fp);
+	rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+
+	if (rc == SQLITE_OK) {
+		sqlite3_bind_int(stmt, 1, id);
+		sqlite3_bind_text(stmt, 2, address, -1, NULL);
+	}
+	else {
+		//think of a good error message
+
+		sqlite3_close(db);
+
+		return -1;
+	}
+
+	rc = sqlite3_step(stmt);
+
+	/*if (rc != SQLITE_DONE) {
+		//think of good error message
+
+		sqlite3_close(db);
+
+		return -1;
+	}*/
+
+	sqlite3_finalize(stmt);
+
+	sqlite3_close(db);
 
 	return 0;
 }

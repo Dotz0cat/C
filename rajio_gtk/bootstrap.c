@@ -1,128 +1,78 @@
 #include "rajio.h"
 
-extern int append_new_station(char* file_name, bson_t* doc, int number);
-extern int write_to_file(char* file_name, bson_t* doc);
+extern int append_new_station(char* file_name, int id, char* name, char* thumbnail, int num_of_addresses);
+extern int append_new_address(char* file_name, int id, char* address);
 
 int main(int argc, char* argv[]) {
 
 	if (argc > 1) {
 		//assume it is the first run
 
-		bson_t doc;
+		sqlite3* db;
 
-		bson_init(&doc);
-		
-		char buffer[400];
-		char str[400];
-		int num;
-		int addresess;
+		int rc = sqlite3_open("/home/seth/c/C/rajio_gtk/stations", &db);
 
-		printf("What is the number of the station?");
-		fgets(buffer, sizeof(buffer), stdin);
-		sscanf(buffer, "%i", &num);
-		bson_append_int32(&doc, "number", -1, (int32_t)num);
+		if (rc != SQLITE_OK) {
+		fprintf(stderr, "cannot open %s\r\n", "/home/seth/c/C/rajio_gtk/stations");
 
-		printf("What is the name of the station?");
-		fgets(buffer, sizeof(buffer), stdin);
-		sscanf(buffer, "%s", str);
-		bson_append_utf8(&doc, "name", -1, str, -1);
+		sqlite3_close(db);
 
-		printf("Where is the thumbnail for the station?");
-		fgets(buffer, sizeof(buffer), stdin);
-		sscanf(buffer, "%s", str);
-		bson_append_utf8(&doc, "thumbnail", -1, str, -1);
+		return -1;
+		}
 
-		printf("How many addresess does the station have?");
-		fgets(buffer, sizeof(buffer), stdin);
-		sscanf(buffer, "%i", &addresess);
-		bson_append_int32(&doc, "num_of_statons", -1, (int32_t) addresess);
+		char* sql = "CREATE TABLE Stations(Id INT, Name TEXT, Thumbnail TEXT, Num_of_addresses INT);"
+					"CREATE TABLE Addresses(Id INT, Address TEXT);";
 
-		if(addresess==0) {
+		rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
+
+		if (rc != SQLITE_OK) {
+			//good error message here
+
+			sqlite3_close(db);
+
 			return -1;
 		}
 
-		char name[100];
-		char address_num[100];
+		//on to the main bootstraper
 
-		for (int i = 0; i < addresess; i++) {
-			printf("Please enter an address to the station");
-			fgets(buffer, sizeof(buffer), stdin);
-			sscanf(buffer, "%s", str);
-			strcat(name, "address");
-			sprintf(address_num, "%i", i);
-			strcat(name, address_num);
-			bson_append_utf8(&doc, name, -1, str, -1);
-		}
-
-		bson_t parent;
-
-		bson_init(&parent);
-
-		bson_append_document(&parent, "1", -1, &doc);
-
-
-		if (write_to_file("/home/seth/c/C/rajio_gtk/stations", &parent) < 0) {
-			fprintf(stderr, "There was a error writing to the file");
-			return -1;
-		}
-
-
-		return 0;
 	}
-
-	bson_t doc;
-
-	bson_init(&doc);
-
 
 	char buffer[400];
 	char str[400];
 	int num;
+	char name[100];
+	char thumbnail[400];
 	int addresess;
 
 	printf("What is the number of the station?");
 	fgets(buffer, sizeof(buffer), stdin);
 	sscanf(buffer, "%i", &num);
-	bson_append_int32(&doc, "number", -1, (int32_t)num);
 
 	printf("What is the name of the station?");
 	fgets(buffer, sizeof(buffer), stdin);
 	sscanf(buffer, "%s", str);
-	bson_append_utf8(&doc, "name", -1, str, -1);
 
 	printf("Where is the thumbnail for the station?");
 	fgets(buffer, sizeof(buffer), stdin);
 	sscanf(buffer, "%s", str);
-	bson_append_utf8(&doc, "thumbnail", -1, str, -1);
 
 	printf("How many addresess does the station have?");
 	fgets(buffer, sizeof(buffer), stdin);
 	sscanf(buffer, "%i", &addresess);
-	bson_append_int32(&doc, "num_of_statons", -1, (int32_t) addresess);
+
+	append_new_station("/home/seth/c/C/rajio_gtk/stations", num, name, thumbnail, addresess);
 
 	if(addresess==0) {
 		return -1;
 	}
 
-	char name[100];
-	char address_num[100];
-
 	for (int i = 0; i < addresess; i++) {
 		printf("Please enter an address to the station");
 		fgets(buffer, sizeof(buffer), stdin);
 		sscanf(buffer, "%s", str);
-		strcat(name, "address");
-		sprintf(address_num, "%i", i);
-		strcat(name, address_num);
-		bson_append_utf8(&doc, name, -1, str, -1);
+		
+		append_new_address("/home/seth/c/C/rajio_gtk/stations", num, str);
 	}
-
-
-	if (append_new_station("/home/seth/c/C/rajio_gtk/stations", &doc, num) < 0) {
-		fprintf(stderr, "There was a error appending to the file");
-		return -1;
-	}
-
 
 	return 0;
 }
