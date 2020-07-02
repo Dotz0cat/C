@@ -20,8 +20,8 @@ int main(int argc, char* argv[]) {
 		return -1;
 		}
 
-		char* sql = "CREATE TABLE Stations(Id INT, Name TEXT, Thumbnail TEXT, Num_of_addresses INT);"
-					"CREATE TABLE Addresses(Id INT, Address TEXT);";
+		char* sql = "CREATE TABLE Stations (Id INT, Name TEXT, Thumbnail TEXT, Num_of_addresses INT);"
+					"CREATE TABLE Addresses (Id INT, Address TEXT);";
 
 		rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
 
@@ -44,19 +44,19 @@ int main(int argc, char* argv[]) {
 	char thumbnail[400];
 	int addresess;
 
-	printf("What is the number of the station?");
+	printf("What is the number of the station? ");
 	fgets(buffer, sizeof(buffer), stdin);
 	sscanf(buffer, "%i", &num);
 
-	printf("What is the name of the station?");
+	printf("What is the name of the station? ");
 	fgets(buffer, sizeof(buffer), stdin);
-	sscanf(buffer, "%s", str);
+	sscanf(buffer, "%s", name);
 
-	printf("Where is the thumbnail for the station?");
+	printf("Where is the thumbnail for the station? ");
 	fgets(buffer, sizeof(buffer), stdin);
-	sscanf(buffer, "%s", str);
+	sscanf(buffer, "%s", thumbnail);
 
-	printf("How many addresess does the station have?");
+	printf("How many addresess does the station have? ");
 	fgets(buffer, sizeof(buffer), stdin);
 	sscanf(buffer, "%i", &addresess);
 
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	for (int i = 0; i < addresess; i++) {
-		printf("Please enter an address to the station");
+		printf("Please enter an address to the station: ");
 		fgets(buffer, sizeof(buffer), stdin);
 		sscanf(buffer, "%s", str);
 		
