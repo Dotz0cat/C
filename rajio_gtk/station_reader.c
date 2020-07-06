@@ -265,7 +265,7 @@ char* get_address(char* file_name, int id) {
 
 	}
 
-	char* sql = "SELECT Adress FROM Adresses WHERE Id = ? LIMIT 1";
+	char* sql = "SELECT Address FROM Addresses WHERE Id = ? LIMIT 1";
 
 	rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
 

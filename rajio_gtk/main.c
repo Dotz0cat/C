@@ -1,5 +1,9 @@
 #include "rajio.h"
+//clang is loud
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
 #include <gtk/gtk.h>
+#pragma clang diagnostic pop
 
 //marcos
 #define sql "/home/seth/c/C/rajio_gtk/stations"
@@ -7,6 +11,9 @@
 //prototypes
 void add_station(GtkWidget* flowbox, char* station_name, char* image_file);
 void station_adder(char* file_name, GtkWidget* flow);
+static void error_message_popup(GtkWidget* parrent, char* error_message);
+int start_playing(int station_id);
+int stop_playing(void);
 
 //gtk callback prototypes
 static void destroy(GtkWidget *widget, gpointer data);
@@ -15,6 +22,8 @@ static void button_clicked_cb(GtkWidget *widget, gpointer data);
 static void event_box_clicked_cb(GtkWidget *widget, gpointer data);
 static void file_chooser_thumbnail_clicked_cb(GtkWidget *widget, gpointer data);
 static void file_chooser_address_clicked_cb(GtkWidget *widget, gpointer parrent);
+static void stop_button_clicked_cb(GtkWidget* widget, gpointer data);
+static void play_button_clicked_cb(GtkWidget* widget, gpointer data);
 
 
 //external prototypes
@@ -23,8 +32,27 @@ extern char* read_station_name(char* file_name, int id);
 extern char* read_station_thumbnail(char* file_name, int id);
 extern int append_new_station(char* file_name, int id, char* name, char* thumbnail, int num_of_addresses);
 extern int append_new_address(char* file_name, int id, char* address);
+extern char* get_address(char* file_name, int id);
 
-int station_number;
+//external parser prototypes
+extern int add_stations(char* file_name, char* sql_file);
+extern int is_valid_url(char* url);
+
+//eternal pulse prototypes
+extern int pulseaudio_init(void);
+extern int pulseaudio_deinit(void);
+
+//the main show
+extern void* play(void* URL);
+
+static int station_number;
+static GtkWidget* station_image;
+static GtkWidget* station_name_label;
+static GtkWidget* play_button;
+static GtkWidget* stop_button;
+int most_recent_id;
+int keepalive;
+pthread_t thread_id;
 
 int main(int argc, char* argv[]) {
 
@@ -33,11 +61,16 @@ int main(int argc, char* argv[]) {
     GtkWidget* flow;
 
     gtk_init(&argc, &argv);
+    pulseaudio_init();
 
     builder = gtk_builder_new();
     gtk_builder_add_from_file(builder, "rajio_gtk_v2.glade", NULL);
     window = GTK_WIDGET(gtk_builder_get_object(builder, "gWindow"));
     flow = GTK_WIDGET(gtk_builder_get_object(builder, "flowbox1"));
+    station_image = GTK_WIDGET(gtk_builder_get_object(builder, "gStaationPlaying"));
+    station_name_label = GTK_WIDGET(gtk_builder_get_object(builder, "gStationNamePlaying"));
+    play_button = GTK_WIDGET(gtk_builder_get_object(builder, "gPlay"));
+    stop_button = GTK_WIDGET(gtk_builder_get_object(builder, "gStop"));
 
     //add the staion images and names to the flowbox
     station_adder(sql, flow);
@@ -47,6 +80,8 @@ int main(int argc, char* argv[]) {
     station_add = GTK_WIDGET(gtk_builder_get_object(builder, "gStationAdd"));
 
     g_signal_connect(station_add, "clicked", G_CALLBACK(button_clicked_cb), (gpointer) window);
+    g_signal_connect(play_button, "clicked", G_CALLBACK(play_button_clicked_cb), (gpointer) window);
+    g_signal_connect(stop_button, "clicked", G_CALLBACK(stop_button_clicked_cb), (gpointer) window);
 
 
 
@@ -55,7 +90,11 @@ int main(int argc, char* argv[]) {
     g_signal_connect(window, "destroy", G_CALLBACK (destroy), NULL);
 
     gtk_widget_show_all(window);
+    gtk_widget_hide(play_button);
+    gtk_widget_hide(stop_button);
     gtk_main();
+
+    pulseaudio_deinit();
 
     return 0;
 }
@@ -84,6 +123,13 @@ void add_station(GtkWidget* flowbox, char* station_name, char* image_file) {
     GtkWidget* event_box;
 
     event_box = gtk_event_box_new();
+
+    char str[50];
+    sprintf(str, "%i", station_number);
+
+    gtk_widget_set_name(event_box, str);
+
+    g_signal_connect(event_box, "button_press_event", G_CALLBACK(event_box_clicked_cb), NULL);
 
     gtk_container_add((GtkContainer*) event_box, (GtkWidget*) grid);
 
@@ -152,10 +198,9 @@ static void button_clicked_cb(GtkWidget *widget, gpointer data) {
     GtkWidget* address_manual_entry;
 
     //useful for later
-    char* name_value;
-    char* thumbnail_path;
+    const char* name_value;
+    const char* thumbnail_path;
     int num_of_addresses;
-    char* address;
 
     //make for name and add to grid
     name = gtk_label_new("Name");
@@ -199,9 +244,9 @@ static void button_clicked_cb(GtkWidget *widget, gpointer data) {
     //make address file entry
     address_file_entry = gtk_entry_new();
 
-    gtk_container_add(GTK_CONTAINER(radio_use_file), address_file_entry);
+    gtk_grid_attach(GTK_GRID(grid), radio_use_file, 0, 8, 1, 1);
 
-    gtk_grid_attach(GTK_GRID(grid), radio_use_file, 1, 8, 3, 1);
+    gtk_grid_attach(GTK_GRID(grid), address_file_entry, 1, 8, 3, 1);
 
     //add the button for file selection
     address_file_chooser = gtk_button_new();
@@ -216,10 +261,9 @@ static void button_clicked_cb(GtkWidget *widget, gpointer data) {
     //entry box
     address_manual_entry = gtk_entry_new();
 
-    gtk_container_add(GTK_CONTAINER(radio_enter_manually), address_manual_entry);
+    gtk_grid_attach(GTK_GRID(grid), radio_enter_manually, 0, 9, 1, 1);
 
-    gtk_grid_attach(GTK_GRID(grid), radio_enter_manually, 1, 9, 4, 1);
-
+    gtk_grid_attach(GTK_GRID(grid), address_manual_entry, 1, 9, 4, 1);
     //add grid to content area
     gtk_container_add(GTK_CONTAINER(content_area), grid);
 
@@ -231,14 +275,47 @@ static void button_clicked_cb(GtkWidget *widget, gpointer data) {
     switch (response) {
         case(GTK_RESPONSE_ACCEPT):
             //get info and make call to append_new_station() and append_new_address
-            name_value = (char*) gtk_entry_get_text(GTK_ENTRY(name_entry));
-            thumbnail_path = (char*) gtk_entry_get_text(GTK_ENTRY(thumbnail_entry));
+            name_value = (const char*) gtk_entry_get_text(GTK_ENTRY(name_entry));
+            if (strcmp(name_value, "") == 0) {
+                error_message_popup(diolouge, "Please enter a valid name");
+            }
+
+            thumbnail_path = (const char*) gtk_entry_get_text(GTK_ENTRY(thumbnail_entry));
+            if (strcmp(thumbnail_path, "") == 0) {
+                error_message_popup(diolouge, "Please enter a valid thumbnail path");
+            }
+
+            num_of_addresses = 0;
+
             if (gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(radio_enter_manually))) {
-                num_of_addresses = 1;
-                address = (char*) gtk_entry_get_text(GTK_ENTRY(address_manual_entry));
-                if (append_new_address(sql, (get_highest_id(sql)+1), address) != 0) {
-                    fprintf(stderr, "There was a error adding a address to the table");
+                
+                const char* address = (const char*) gtk_entry_get_text(GTK_ENTRY(address_manual_entry));
+
+                if (is_valid_url(address) == 0) {
+                    num_of_addresses = 1;
+                    if (append_new_address(sql, (get_highest_id(sql)+1), address) != 0) {
+                        fprintf(stderr, "There was a error adding a address to the table\r\n");
+                    }
                 }
+                else {
+                    error_message_popup(diolouge, "The address entered was not valid");
+                }
+            }
+            else {
+                //the use file button is toggled
+                const char* address = (const char*) gtk_entry_get_text(GTK_ENTRY(address_file_entry));
+                num_of_addresses = add_stations(address, sql);
+                if (num_of_addresses <= 0) {
+                    error_message_popup(diolouge, "There was a error parsing the file provided\r\nor the file was not valid");
+                }
+            }
+
+            if (num_of_addresses <= 0) {
+                error_message_popup(diolouge, "There was a issue somewhere");
+            }
+
+            if (append_new_station(sql, get_highest_id(sql)+1, name_value, thumbnail_path, num_of_addresses) != 0) {
+                error_message_popup(diolouge, "There was a error adding the station");
             }
         break;
         default:
@@ -249,7 +326,27 @@ static void button_clicked_cb(GtkWidget *widget, gpointer data) {
 }
 
 static void event_box_clicked_cb(GtkWidget *widget, gpointer data) {
+    char* id;
+    id = gtk_widget_get_name(widget);
 
+    int id_num = atoi(id);
+
+    most_recent_id = id_num;
+
+    //get the gtk window
+    GtkWidget* flow_child = gtk_widget_get_parent(widget);
+    GtkWidget* flow = gtk_widget_get_parent(flow_child);
+    GtkWidget* view = gtk_widget_get_parent(flow);
+    GtkWidget* scroll = gtk_widget_get_parent(view);
+    GtkWidget* fixed = gtk_widget_get_parent(scroll);
+    GtkWidget* window = gtk_widget_get_parent(fixed);
+
+    if (start_playing(id_num) != 0) {
+        error_message_popup(window, "There was a error somewhere");
+        return;
+    }
+
+    return;
 }
 
 //this is for the thumbnail
@@ -314,7 +411,6 @@ static void file_chooser_address_clicked_cb(GtkWidget *widget, gpointer parrent)
     //intermediate
     GtkWidget* grid;
     GtkWidget* box;
-    GtkWidget* radio;
     GList* list;
 
     box = gtk_bin_get_child(GTK_BIN(parrent));
@@ -336,9 +432,7 @@ static void file_chooser_address_clicked_cb(GtkWidget *widget, gpointer parrent)
         }
     }
 
-    radio = gtk_grid_get_child_at(GTK_GRID(grid), 1, 8);
-
-    entry = gtk_bin_get_child(GTK_BIN(radio));
+    entry = gtk_grid_get_child_at(GTK_GRID(grid), 1, 8);
 
     GtkFileChooserAction action = GTK_FILE_CHOOSER_ACTION_OPEN;
 
@@ -361,4 +455,99 @@ static void file_chooser_address_clicked_cb(GtkWidget *widget, gpointer parrent)
     }
 
     gtk_widget_destroy(dialog);
+}
+
+static void error_message_popup(GtkWidget* parrent, char* error_message) {
+    GtkWidget* dialog;
+    GtkWidget* label;
+    GtkWidget* content_area;
+
+    //GtkDialogFlags flags = GTK_DIALOG_DESTROY_WITH_PARENT;
+
+    dialog = gtk_dialog_new_with_buttons("ERROR", GTK_WINDOW(parrent), NULL, "Ok", GTK_RESPONSE_NONE, NULL);
+
+    content_area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+
+    label = gtk_label_new(error_message);
+
+    gtk_container_add(GTK_CONTAINER(content_area), label);
+
+    gtk_widget_show_all(dialog);
+
+    (void) gtk_dialog_run(GTK_DIALOG(dialog));
+    //when this is done just quit and destroy the dialog and the parent
+
+    gtk_widget_destroy(dialog);
+
+    //gtk_widget_destroy(parrent);
+
+}
+
+int start_playing(int station_id) {
+    char* address = get_address(sql, station_id);
+
+    char address_stack[512];
+
+    strcpy(address, address_stack);
+
+    free(address);
+
+    char* thumbnail;
+
+    thumbnail = read_station_thumbnail(sql, station_id);
+
+    char* name;
+
+    name = read_station_name(sql, station_id);
+
+    if (!thread_id) {
+        pthread_create(&thread_id, NULL, play, address_stack);
+        gtk_widget_show(stop_button);
+        gtk_widget_hide(play_button);
+        gtk_image_set_from_resource(GTK_IMAGE(station_image), thumbnail);
+        gtk_label_set_text(GTK_LABEL(station_name_label), name);
+    }
+    else {
+        if (stop_playing() != 0) {
+            return -1;
+        }
+        start_playing(station_id);
+    }
+
+    free(thumbnail);
+    free(name);
+
+    return 0;
+}
+
+int stop_playing() {
+    if (!thread_id) {
+        return -1;
+    }
+    else {
+        keepalive = 1;
+        pthread_join(thread_id, NULL);
+        gtk_widget_show(play_button);
+        gtk_widget_hide(stop_button);
+        gtk_image_set_from_icon_name(GTK_IMAGE(station_image), "audio-x-generic", GTK_ICON_SIZE_BUTTON);
+        gtk_label_set_text(GTK_LABEL(station_name_label), "No Station Playing");
+    }
+
+    return 0;
+}
+
+static void stop_button_clicked_cb(GtkWidget* widget, gpointer data) {
+    if (stop_playing() != 0) {
+        error_message_popup(data, "There was a error with stoping");
+    }
+}
+
+static void play_button_clicked_cb(GtkWidget* widget, gpointer data) {
+    if (!most_recent_id) {
+        error_message_popup(data, "There was a error with starting");
+    }
+
+    if (start_playing(most_recent_id) != 0) {
+        error_message_popup(data, "There was a error with starting");
+    }
 }
