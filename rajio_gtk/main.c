@@ -37,22 +37,18 @@ extern char* get_address(char* file_name, int id);
 //external parser prototypes
 extern int add_stations(char* file_name, char* sql_file);
 extern int is_valid_url(char* url);
+extern int contains_a_pls(char* url);
+extern char* get_address_from_pls_over_net(char* pls_file);
 
-//eternal pulse prototypes
-extern int pulseaudio_init(void);
-extern int pulseaudio_deinit(void);
-
-//the main show
-extern void* play(void* URL);
-
+//global variables
 static int station_number;
 static GtkWidget* station_image;
 static GtkWidget* station_name_label;
 static GtkWidget* play_button;
 static GtkWidget* stop_button;
+//add pause button
 int most_recent_id;
-int keepalive;
-pthread_t thread_id;
+GstElement* pipeline;
 
 int main(int argc, char* argv[]) {
 
@@ -61,7 +57,8 @@ int main(int argc, char* argv[]) {
     GtkWidget* flow;
 
     gtk_init(&argc, &argv);
-    pulseaudio_init();
+
+    gst_init(&argc, &argv);
 
     builder = gtk_builder_new();
     gtk_builder_add_from_file(builder, "rajio_gtk_v2.glade", NULL);
@@ -93,8 +90,6 @@ int main(int argc, char* argv[]) {
     gtk_widget_hide(play_button);
     gtk_widget_hide(stop_button);
     gtk_main();
-
-    pulseaudio_deinit();
 
     return 0;
 }
@@ -488,7 +483,9 @@ int start_playing(int station_id) {
 
     char address_stack[512];
 
-    strcpy(address, address_stack);
+    strcpy(address_stack, address);
+
+    printf("address_stack: %s\r\n", address_stack);
 
     free(address);
 
@@ -500,19 +497,82 @@ int start_playing(int station_id) {
 
     name = read_station_name(sql, station_id);
 
-    if (!thread_id) {
-        pthread_create(&thread_id, NULL, play, address_stack);
-        gtk_widget_show(stop_button);
-        gtk_widget_hide(play_button);
-        gtk_image_set_from_resource(GTK_IMAGE(station_image), thumbnail);
-        gtk_label_set_text(GTK_LABEL(station_name_label), name);
-    }
-    else {
-        if (stop_playing() != 0) {
+    if (!pipeline) {
+        printf("url: %i\r\n", is_valid_url(address_stack));
+        printf("pls: %i\r\n", contains_a_pls(address_stack));
+        if (is_valid_url(address_stack) == 0 && contains_a_pls(address_stack) == 0) {
+            char* true_address;
+            true_address = get_address_from_pls_over_net(address_stack);
+
+            printf("url: %i\r\n", is_valid_url(true_address));
+
+            printf("true_address: %s\r\n", true_address);
+
+            if (is_valid_url(true_address) != 0) return -1;
+
+            printf("here\r\n");
+
+            char uri[256];
+
+            strcat(uri, "playbin uri=");
+            strcat(uri, true_address);
+
+            pipeline = gst_parse_launch(uri, NULL);
+
+        }
+        else if (is_valid_url(address_stack) == 0) {
+            char uri[256];
+
+            strcat(uri, "playbin uri=");
+            strcat(uri, address_stack);
+
+            pipeline = gst_parse_launch(uri, NULL);
+        }
+        else {
+            printf("error this is not true\r\n");
             return -1;
         }
-        start_playing(station_id);
     }
+    else {
+        gst_element_set_state(pipeline, GST_STATE_READY);
+        if (is_valid_url(address_stack) == 0 && contains_a_pls(address_stack) == 0) {
+            char* true_address;
+            true_address = get_address_from_pls_over_net(address_stack);
+
+            printf("%s\r\n", true_address);
+
+            if (is_valid_url(true_address) != 0) return -1;
+
+            char uri[256];
+
+            strcat(uri, "playbin uri=");
+            strcat(uri, true_address);
+
+            pipeline = gst_parse_launch(uri, NULL);
+
+        }
+        else if (is_valid_url(address_stack) == 0) {
+            char uri[256];
+
+            strcat(uri, "playbin uri=");
+            strcat(uri, address_stack);
+
+            pipeline = gst_parse_launch(uri, NULL);
+        }
+        else {
+            printf("error this is not true\r\n");
+            return -1;
+        }
+    }
+
+    gst_element_set_state(pipeline, GST_STATE_PLAYING);
+
+
+
+    gtk_widget_show(stop_button);
+    gtk_widget_hide(play_button);
+    gtk_image_set_from_resource(GTK_IMAGE(station_image), thumbnail);
+    gtk_label_set_text(GTK_LABEL(station_name_label), name);
 
     free(thumbnail);
     free(name);
@@ -521,17 +581,17 @@ int start_playing(int station_id) {
 }
 
 int stop_playing() {
-    if (!thread_id) {
+
+    if (!pipeline) {
         return -1;
     }
-    else {
-        keepalive = 1;
-        pthread_join(thread_id, NULL);
-        gtk_widget_show(play_button);
-        gtk_widget_hide(stop_button);
-        gtk_image_set_from_icon_name(GTK_IMAGE(station_image), "audio-x-generic", GTK_ICON_SIZE_BUTTON);
-        gtk_label_set_text(GTK_LABEL(station_name_label), "No Station Playing");
-    }
+    
+    gst_element_set_state(pipeline, GST_STATE_READY);
+
+    gtk_widget_show(play_button);
+    gtk_widget_hide(stop_button);
+    gtk_image_set_from_icon_name(GTK_IMAGE(station_image), "audio-x-generic", GTK_ICON_SIZE_BUTTON);
+    gtk_label_set_text(GTK_LABEL(station_name_label), "No Station Playing");
 
     return 0;
 }
