@@ -512,7 +512,9 @@ char* get_address_from_pls_over_net(char* pls_file) {
 	g_object_unref(stream);
 	g_object_unref(fp);
 
-	char done[256];
+	char* done;
+
+	done = malloc(256 * sizeof(char));
 
 	strcpy(done, string);
 

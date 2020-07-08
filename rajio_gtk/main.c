@@ -504,8 +504,6 @@ int start_playing(int station_id) {
             char* true_address;
             true_address = get_address_from_pls_over_net(address_stack);
 
-            printf("url: %i\r\n", is_valid_url(true_address));
-
             printf("true_address: %s\r\n", true_address);
 
             if (is_valid_url(true_address) != 0) return -1;
@@ -518,6 +516,8 @@ int start_playing(int station_id) {
             strcat(uri, true_address);
 
             pipeline = gst_parse_launch(uri, NULL);
+
+            free(true_address);
 
         }
         else if (is_valid_url(address_stack) == 0) {
