@@ -17,7 +17,13 @@ void set_message_handlers(GstBus *bus, const char* sql_file) {
 }
 
 void error_handler(GstBus *bus, GstMessage *msg, gpointer data) {
+	GError *err;
+    gchar *debug;
 
+    gst_message_parse_error(msg, &err, &debug);
+    printf("Error: %s\n", err->message);
+    g_error_free(err);
+    g_free(debug);
 }
 
 void eos_handler(GstBus *bus, GstMessage *msg, gpointer data) {

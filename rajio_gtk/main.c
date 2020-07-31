@@ -16,6 +16,7 @@ int start_playing(int station_id);
 int stop_playing(void);
 GtkWidget* make_image_from_file(char* file, int x, int y);
 void change_station_playing_image(char* thumbnail);
+int set_timestamp_tsparser(void);
 
 //gtk callback prototypes
 static void destroy(GtkWidget *widget, gpointer data);
@@ -530,6 +531,10 @@ int start_playing(int station_id) {
 
         g_object_set(pipeline, "uri", address_stack, NULL);
 
+        if (set_timestamp_tsparser() != 0) {
+            printf("pipeline does not have a tsparser");
+        }
+
     }
     else return -1;
 
@@ -625,4 +630,53 @@ void change_station_playing_image(char* thumbnail) {
     gtk_image_set_from_pixbuf(GTK_IMAGE(station_image), pixbuf);
 
     g_object_unref(pixbuf);
+}
+
+int set_timestamp_tsparser() {
+    //for when gstreamer 1.18 drops
+    /*GstIterator* iter;
+    GValue* tsparser;
+
+    iter = gst_bin_iterate_all_by_element_factory_name(GST_BIN(pipeline), "tsparser");
+
+    if (gst_iterator_next(iter, tsparser) == GST_ITERATOR_OK) {
+        g_object_set(G_OBJECT(tsparser), "set-timestamps", TRUE, NULL);
+        g_value_unset(tsparser);
+        gst_iterator_free(iter);
+        return 0;
+    }
+
+    return -1;*/
+
+    GstIterator* iter;
+    GValue* tsparser;
+
+    iter = gst_bin_iterate_elements(GST_BIN(pipeline));
+
+    //tsparser = g_value_init(tsparser, g_type_from_name("GstBin"));
+
+    //tsparser = calloc(1, 1024);
+
+    while (gst_iterator_next(iter, tsparser) == GST_ITERATOR_OK) {
+
+        //get name
+        char* name;
+
+        name = gst_object_get_name(GST_OBJECT(tsparser));
+
+        if (g_strv_contains(name, "tsparser")) {
+            g_object_set(G_OBJECT(tsparser), "set-timestamps", TRUE, NULL);
+            g_free(name);
+            g_value_unset(tsparser);
+            gst_iterator_free(iter);
+            return 0;
+        }
+
+        g_free(name);
+    }
+
+    //g_value_unset(tsparser);
+    gst_iterator_free(iter);
+
+    return -1;
 }
