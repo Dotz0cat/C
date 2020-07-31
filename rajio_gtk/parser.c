@@ -386,7 +386,7 @@ char* get_address_from_pls_over_net(char* pls_file) {
 	strcat(str, number);
 	strcat(str, "=");
 
-	printf("regex: %s\r\n", str);
+	//printf("regex: %s\r\n", str);
 
 	error_num = regcomp(&regex, "\\(http\\|ftp\\|http\\):\\/\\/\\(www\\.\\)\\?[a-z0-9A-z\\.:]\\{2,256\\}", REG_ICASE);
 	if (error_num) {

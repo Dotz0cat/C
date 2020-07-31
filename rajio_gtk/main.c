@@ -14,6 +14,8 @@ void station_adder(char* file_name, GtkWidget* flow);
 static void error_message_popup(GtkWidget* parrent, char* error_message);
 int start_playing(int station_id);
 int stop_playing(void);
+GtkWidget* make_image_from_file(char* file, int x, int y);
+void change_station_playing_image(char* thumbnail);
 
 //gtk callback prototypes
 static void destroy(GtkWidget *widget, gpointer data);
@@ -24,6 +26,7 @@ static void file_chooser_thumbnail_clicked_cb(GtkWidget *widget, gpointer data);
 static void file_chooser_address_clicked_cb(GtkWidget *widget, gpointer parrent);
 static void stop_button_clicked_cb(GtkWidget* widget, gpointer data);
 static void play_button_clicked_cb(GtkWidget* widget, gpointer data);
+static void pause_button_clicked_cb(GtkWidget* widget, gpointer data);
 
 
 //external prototypes
@@ -33,6 +36,7 @@ extern char* read_station_thumbnail(char* file_name, int id);
 extern int append_new_station(char* file_name, int id, char* name, char* thumbnail, int num_of_addresses);
 extern int append_new_address(char* file_name, int id, char* address);
 extern char* get_address(char* file_name, int id);
+extern void set_message_handlers(GstBus *bus, const char* sql_file);
 
 //external parser prototypes
 extern int add_stations(char* file_name, char* sql_file);
@@ -46,6 +50,7 @@ static GtkWidget* station_image;
 static GtkWidget* station_name_label;
 static GtkWidget* play_button;
 static GtkWidget* stop_button;
+static GtkWidget* pause_button;
 //add pause button
 int most_recent_id;
 GstElement* pipeline;
@@ -56,9 +61,19 @@ int main(int argc, char* argv[]) {
     GtkWidget* window;
     GtkWidget* flow;
 
+    GstBus* bus;
+
     gtk_init(&argc, &argv);
 
     gst_init(&argc, &argv);
+
+    pipeline = gst_element_factory_make("playbin", NULL);
+
+    gst_element_set_state(pipeline, GST_STATE_READY);
+
+    bus = gst_element_get_bus(pipeline);
+
+    set_message_handlers(bus, sql);
 
     builder = gtk_builder_new();
     gtk_builder_add_from_file(builder, "rajio_gtk_v2.glade", NULL);
@@ -68,6 +83,7 @@ int main(int argc, char* argv[]) {
     station_name_label = GTK_WIDGET(gtk_builder_get_object(builder, "gStationNamePlaying"));
     play_button = GTK_WIDGET(gtk_builder_get_object(builder, "gPlay"));
     stop_button = GTK_WIDGET(gtk_builder_get_object(builder, "gStop"));
+    pause_button = GTK_WIDGET(gtk_builder_get_object(builder, "gPause"));
 
     //add the staion images and names to the flowbox
     station_adder(sql, flow);
@@ -79,6 +95,7 @@ int main(int argc, char* argv[]) {
     g_signal_connect(station_add, "clicked", G_CALLBACK(button_clicked_cb), (gpointer) window);
     g_signal_connect(play_button, "clicked", G_CALLBACK(play_button_clicked_cb), (gpointer) window);
     g_signal_connect(stop_button, "clicked", G_CALLBACK(stop_button_clicked_cb), (gpointer) window);
+    g_signal_connect(pause_button, "clicked", G_CALLBACK(pause_button_clicked_cb), (gpointer) window);
 
 
 
@@ -89,30 +106,31 @@ int main(int argc, char* argv[]) {
     gtk_widget_show_all(window);
     gtk_widget_hide(play_button);
     gtk_widget_hide(stop_button);
+    gtk_widget_hide(pause_button);
     gtk_main();
 
     return 0;
 }
 
 void add_station(GtkWidget* flowbox, char* station_name, char* image_file) {
-    GtkGrid* grid;
+    GtkWidget* grid;
 
-    grid = (GtkGrid*) gtk_grid_new();
+    grid = gtk_grid_new();
 
-    gtk_grid_set_row_homogeneous(grid, TRUE);
-    gtk_grid_set_column_homogeneous(grid, TRUE);
+    gtk_grid_set_row_homogeneous(GTK_GRID(grid), TRUE);
+    gtk_grid_set_column_homogeneous(GTK_GRID(grid), TRUE);
 
     //make the gtkImage
-    GtkImage* image;
-    image = (GtkImage*) gtk_image_new_from_file(image_file);
+    GtkWidget* image;
+    image = make_image_from_file(image_file, 100, 100);
 
-    gtk_grid_attach(grid, (GtkWidget*) image, 0, 0, 3, 2);
+    gtk_grid_attach(GTK_GRID(grid), image, 0, 0, 3, 2);
 
     //make the label
     GtkWidget* label;
     label = gtk_label_new(station_name);
 
-    gtk_grid_attach(grid, label, 0, 2, 3, 1);
+    gtk_grid_attach(GTK_GRID(grid), label, 0, 2, 3, 1);
 
     //wrap the grid in a event box
     GtkWidget* event_box;
@@ -126,12 +144,12 @@ void add_station(GtkWidget* flowbox, char* station_name, char* image_file) {
 
     g_signal_connect(event_box, "button_press_event", G_CALLBACK(event_box_clicked_cb), NULL);
 
-    gtk_container_add((GtkContainer*) event_box, (GtkWidget*) grid);
+    gtk_container_add(GTK_CONTAINER(event_box), grid);
 
     //need to add some event handllers to the event box
 
     //add the event box to the flowbox
-    gtk_container_add((GtkContainer*) flowbox, (GtkWidget*) event_box);
+    gtk_container_add(GTK_CONTAINER(flowbox), event_box);
 
     //icremnt the station number
     station_number++;
@@ -485,8 +503,6 @@ int start_playing(int station_id) {
 
     strcpy(address_stack, address);
 
-    printf("address_stack: %s\r\n", address_stack);
-
     free(address);
 
     char* thumbnail;
@@ -497,81 +513,34 @@ int start_playing(int station_id) {
 
     name = read_station_name(sql, station_id);
 
-    if (!pipeline) {
-        printf("url: %i\r\n", is_valid_url(address_stack));
-        printf("pls: %i\r\n", contains_a_pls(address_stack));
-        if (is_valid_url(address_stack) == 0 && contains_a_pls(address_stack) == 0) {
+    gst_element_set_state(pipeline, GST_STATE_READY);
+
+    if (is_valid_url(address_stack) == 0 && contains_a_pls(address_stack) == 0) {
             char* true_address;
             true_address = get_address_from_pls_over_net(address_stack);
 
-            printf("true_address: %s\r\n", true_address);
-
             if (is_valid_url(true_address) != 0) return -1;
 
-            printf("here\r\n");
-
-            char uri[256];
-
-            strcat(uri, "playbin uri=");
-            strcat(uri, true_address);
-
-            pipeline = gst_parse_launch(uri, NULL);
+            g_object_set(pipeline, "uri", true_address, NULL);
 
             free(true_address);
 
-        }
-        else if (is_valid_url(address_stack) == 0) {
-            char uri[256];
-
-            strcat(uri, "playbin uri=");
-            strcat(uri, address_stack);
-
-            pipeline = gst_parse_launch(uri, NULL);
-        }
-        else {
-            printf("error this is not true\r\n");
-            return -1;
-        }
     }
-    else {
-        gst_element_set_state(pipeline, GST_STATE_READY);
-        if (is_valid_url(address_stack) == 0 && contains_a_pls(address_stack) == 0) {
-            char* true_address;
-            true_address = get_address_from_pls_over_net(address_stack);
+    else if (is_valid_url(address_stack) == 0) {
 
-            printf("%s\r\n", true_address);
+        g_object_set(pipeline, "uri", address_stack, NULL);
 
-            if (is_valid_url(true_address) != 0) return -1;
-
-            char uri[256];
-
-            strcat(uri, "playbin uri=");
-            strcat(uri, true_address);
-
-            pipeline = gst_parse_launch(uri, NULL);
-
-        }
-        else if (is_valid_url(address_stack) == 0) {
-            char uri[256];
-
-            strcat(uri, "playbin uri=");
-            strcat(uri, address_stack);
-
-            pipeline = gst_parse_launch(uri, NULL);
-        }
-        else {
-            printf("error this is not true\r\n");
-            return -1;
-        }
     }
+    else return -1;
 
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
 
 
     gtk_widget_show(stop_button);
+    gtk_widget_show(pause_button);
     gtk_widget_hide(play_button);
-    gtk_image_set_from_resource(GTK_IMAGE(station_image), thumbnail);
+    change_station_playing_image(thumbnail);
     gtk_label_set_text(GTK_LABEL(station_name_label), name);
 
     free(thumbnail);
@@ -582,14 +551,11 @@ int start_playing(int station_id) {
 
 int stop_playing() {
 
-    if (!pipeline) {
-        return -1;
-    }
-    
     gst_element_set_state(pipeline, GST_STATE_READY);
 
     gtk_widget_show(play_button);
     gtk_widget_hide(stop_button);
+    gtk_widget_hide(pause_button);
     gtk_image_set_from_icon_name(GTK_IMAGE(station_image), "audio-x-generic", GTK_ICON_SIZE_BUTTON);
     gtk_label_set_text(GTK_LABEL(station_name_label), "No Station Playing");
 
@@ -603,11 +569,60 @@ static void stop_button_clicked_cb(GtkWidget* widget, gpointer data) {
 }
 
 static void play_button_clicked_cb(GtkWidget* widget, gpointer data) {
-    if (!most_recent_id) {
-        error_message_popup(data, "There was a error with starting");
-    }
 
-    if (start_playing(most_recent_id) != 0) {
-        error_message_popup(data, "There was a error with starting");
-    }
+    gst_element_set_state(pipeline, GST_STATE_PLAYING);
+
+    char* thumbnail;
+
+    thumbnail = read_station_thumbnail(sql, most_recent_id);
+
+    char* name;
+
+    name = read_station_name(sql, most_recent_id);
+
+    gtk_widget_show(stop_button);
+    gtk_widget_show(pause_button);
+    gtk_widget_hide(play_button);
+    change_station_playing_image(thumbnail);
+    gtk_label_set_text(GTK_LABEL(station_name_label), name);
+
+    free(thumbnail);
+    free(name);
+}
+
+static void pause_button_clicked_cb(GtkWidget* widget, gpointer data) {
+    gst_element_set_state(pipeline, GST_STATE_PAUSED);
+
+    gtk_label_set_text(GTK_LABEL(station_name_label), "Paused");
+
+    gtk_widget_show(play_button);
+    gtk_widget_show(stop_button);
+    gtk_widget_hide(pause_button);
+}
+
+GtkWidget* make_image_from_file(char* file, int x, int y) {
+    GtkWidget* image;
+    GdkPixbuf* pixbuf;
+
+    //GError* error = NULL;
+
+    pixbuf = gdk_pixbuf_new_from_file_at_scale(file, x, y, FALSE, NULL);
+
+    //fprintf(stderr, "error with pixbuf: %s\r\n", error->message);
+
+    image = gtk_image_new_from_pixbuf(pixbuf);
+
+    g_object_unref(pixbuf);
+
+    return image;
+}
+
+void change_station_playing_image(char* thumbnail) {
+    GdkPixbuf* pixbuf;
+
+    pixbuf = gdk_pixbuf_new_from_file_at_scale(thumbnail, 50, 50, FALSE, NULL);
+
+    gtk_image_set_from_pixbuf(GTK_IMAGE(station_image), pixbuf);
+
+    g_object_unref(pixbuf);
 }

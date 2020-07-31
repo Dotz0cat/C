@@ -42,15 +42,7 @@ int append_new_station(char* file_name, int id, char* name, char* thumbnail, int
 		return -1;
 	}
 
-	rc = sqlite3_step(stmt);
-
-	/*if (rc != SQLITE_DONE) {
-		//think of good error message
-
-		sqlite3_close(db);
-
-		return -1;
-	}*/
+	sqlite3_step(stmt);
 
 	sqlite3_finalize(stmt);
 
@@ -90,7 +82,7 @@ int append_new_address(char* file_name, int id, char* address) {
 		return -1;
 	}
 
-	rc = sqlite3_step(stmt);
+	sqlite3_step(stmt);
 
 	sqlite3_finalize(stmt);
 
