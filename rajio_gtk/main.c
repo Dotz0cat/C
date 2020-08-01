@@ -44,6 +44,7 @@ extern int add_stations(char* file_name, char* sql_file);
 extern int is_valid_url(char* url);
 extern int contains_a_pls(char* url);
 extern char* get_address_from_pls_over_net(char* pls_file);
+extern int genaric_regex(const char* string, const char* regex_string);
 
 //global variables
 static int station_number;
@@ -532,7 +533,7 @@ int start_playing(int station_id) {
         g_object_set(pipeline, "uri", address_stack, NULL);
 
         if (set_timestamp_tsparser() != 0) {
-            printf("pipeline does not have a tsparser");
+            printf("pipeline does not have a tsparser\r\n");
         }
 
     }
@@ -651,28 +652,52 @@ int set_timestamp_tsparser() {
     GstIterator* iter;
     GValue* tsparser;
 
-    iter = gst_bin_iterate_elements(GST_BIN(pipeline));
+    iter = gst_bin_iterate_recurse(GST_BIN(pipeline));
 
-    //tsparser = g_value_init(tsparser, g_type_from_name("GstBin"));
+    tsparser = calloc(1, sizeof(GValue));
+
+    int done = 0;
+
+    tsparser = g_value_init(tsparser, g_type_from_name("GstElement"));
 
     //tsparser = calloc(1, 1024);
 
-    while (gst_iterator_next(iter, tsparser) == GST_ITERATOR_OK) {
+    char* name;
 
-        //get name
-        char* name;
+    while (done == 0) {
 
-        name = gst_object_get_name(GST_OBJECT(tsparser));
+        switch (gst_iterator_next(iter, tsparser)) {
+            case GST_ITERATOR_OK:
 
-        if (g_strv_contains(name, "tsparser")) {
-            g_object_set(G_OBJECT(tsparser), "set-timestamps", TRUE, NULL);
-            g_free(name);
-            g_value_unset(tsparser);
-            gst_iterator_free(iter);
-            return 0;
+                printf("here\r\n");
+
+                name = gst_object_get_name(GST_OBJECT(g_value_peek_pointer(tsparser)));
+
+                if (name == NULL) break;
+
+                printf("element: %s\r\n", name);
+
+                if (genaric_regex(name, "tsparser") == 0) {
+                    g_object_set(G_OBJECT(g_value_peek_pointer(tsparser)), "set-timestamps", TRUE, NULL);
+                    g_free(name);
+                    g_value_unset(tsparser);
+                    gst_iterator_free(iter);
+                    return 0;
+                }
+
+                g_free(name);
+                g_value_reset(tsparser);
+                break;
+            case GST_ITERATOR_RESYNC:
+                gst_iterator_resync(iter);
+                break;
+            case GST_ITERATOR_ERROR:
+                done = 1;
+                break;
+            case GST_ITERATOR_DONE:
+                done = 1;
+                break;
         }
-
-        g_free(name);
     }
 
     //g_value_unset(tsparser);

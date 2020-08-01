@@ -14,6 +14,7 @@ int pls_parser(char* file_name, char* sql_file);
 int is_valid_url(char* url);
 int contains_a_pls(char* url);
 char* get_address_from_pls_over_net(char* pls_file);
+int genaric_regex(const char* string, const char* regex_string);
 
 //external prototypes
 extern int append_new_address(char* file_name, int id, char* address);
@@ -521,4 +522,27 @@ char* get_address_from_pls_over_net(char* pls_file) {
 	free(line);
 
 	return done;
+}
+
+int genaric_regex(const char* string, const char* regex_string) {
+	regex_t regex;
+	int error_num;
+	char err_msg[256];
+
+	error_num = regcomp(&regex, regex_string, REG_ICASE);
+	if (error_num) {
+		regerror(error_num, &regex, err_msg, sizeof(err_msg));
+		fprintf(stderr, "error doing regex: %s\r\n", err_msg);
+		return -1;
+	}
+
+	error_num = regexec(&regex, string, 0, NULL, 0);
+	if (!error_num) {
+		regfree(&regex);
+		return 0;
+	}
+
+	regfree(&regex);
+
+	return 1;
 }
