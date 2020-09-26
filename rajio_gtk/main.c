@@ -532,16 +532,16 @@ int start_playing(int station_id) {
 
         g_object_set(pipeline, "uri", address_stack, NULL);
 
-        if (set_timestamp_tsparser() != 0) {
-            printf("pipeline does not have a tsparser\r\n");
-        }
-
     }
     else return -1;
 
     gst_element_set_state(pipeline, GST_STATE_PLAYING);
 
 
+
+    /*if (set_timestamp_tsparser() != 0) {
+        printf("pipeline does not have a tsparser\r\n");
+    }*/
 
     gtk_widget_show(stop_button);
     gtk_widget_show(pause_button);
