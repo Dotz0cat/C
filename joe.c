@@ -41,6 +41,18 @@ int main(int argc, char** argv) {
                 return EXIT_FAILURE;
         }
     }
+
+    if (number <= 0) {
+    	fprintf(stderr, "n must be greater than 0\r\n");
+    	return 1;
+    }
+
+    if (k_number <= 1) {
+    	fprintf(stderr, "k must be greater than 1\r\n");
+    	return 1;
+    }
+
+
 	struct things *list = malloc(sizeof(struct things) * number);
 	int alive = number;
 
@@ -59,7 +71,7 @@ int main(int argc, char** argv) {
 	struct things *current = head;
 
 	printf("\033c");
-	
+
 	if (verbose) {
 		print_status(number, list, verbose);
 	}
