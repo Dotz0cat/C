@@ -3,8 +3,8 @@
 #include <unistd.h>
 
 enum state {
-	alive,
-	dead
+	Alive,
+	Dead
 };
 
 struct things {
@@ -14,22 +14,39 @@ struct things {
 	void* next;
 };
 
-void print_so_far(int number, struct things *list);
-void print_final(int number, struct things *list);
+void print_status(int number, struct things *list, int verbose);
 
 int main(int argc, char** argv) {
-	if (argc != 2) {
-		fprintf(stderr, "Usage: %s n\r\n", argv[0]);
-		return 1;
-	}
+	int verbose = 0;
+	int number = 1;
+	int k_number = 2;
 
-	int number = atoi(argv[1]);
+	int opt;
+	while((opt = getopt(argc, argv, "vVn:k:")) != -1) {
+        switch(opt) {
+            case 'v':
+                verbose = 1;
+                break;
+            case 'V':
+                verbose = 2;
+                break;
+            case 'n':
+                number = atoi(optarg);
+                break;
+            case 'k':
+                k_number = atoi(optarg);
+                break;
+            default: /* ? */
+                fprintf(stderr, "Usage: %s [-v] [-n] [-k]\r\n", argv[0]);
+                return EXIT_FAILURE;
+        }
+    }
 	struct things *list = malloc(sizeof(struct things) * number);
 	int alive = number;
 
 	for (int i = 0; i <= number; i++) {
 		list[i].number = i + 1;
-		list[i].status = alive;
+		list[i].status = Alive;
 		if (i != 0 || i != number) {
 			list[i - 1].next = &list[i];
 		}
@@ -40,57 +57,57 @@ int main(int argc, char** argv) {
 	
 	struct things *head = list;
 	struct things *current = head;
+
+	printf("\033c");
 	
-
-	// do {
-	int last = 0;
-	while (alive != 1 || alive <= 0) {
-		//skip ahead by 6
-		for (int i = 0; i < 6; i++) {
-			current = current->next;
-		}
-		if (current->number < last) {
-			print_final(number, list);
-			sleep(5);
-		}
-		if (current->status == dead) {
-			do {
-				current = current->next;
-			} while (current->status == dead);
-		}
-		current->status = dead;
-		alive--;
-		last = current->number;
-
-		if (alive == 1) {
-			break;
-		}
-
+	if (verbose) {
+		print_status(number, list, verbose);
 	}
 
-	print_final(number, list);
+	while (alive != 1) {
 
-	// } while (1);
+		//skip ahead by k
+		if (alive == number) {
+			for (int i = 1; i < k_number; i++) {
+				current = current->next;
+			}
+		}
+		else {
+			for (int i = 1; i < k_number;) {
+				if (current->status == Alive) {
+					i++;
+				}
+				current = current->next;
+			}
+		}
+		
+		if (current->status == Dead) {
+			do {
+				current = current->next;
+			} while (current->status == Dead);
+		}
+		current->status = Dead;
+		alive--;
+
+		if (verbose) {
+			print_status(number, list, verbose);
+			sleep(1);
+		}
+	}
+
+	print_status(number, list, verbose);
 
 	return 0;
 }
 
-void print_so_far(int number, struct things *list) {
-	printf("\033c");
-	for (int i = 0; i < number; i++) {
-		if (list[i].status == alive) {
-			printf("%4i", list[i].number);
-		}
-		
+void print_status(int number, struct things *list, int verbose) {
+	if (verbose == 1) {
+		printf("\033c");
 	}
-	printf("\r\n");
-}
 
-void print_final(int number, struct things *list) {
-	printf("\033c");
 	for (int i = 0; i < number; i++) {
-		if (list[i].status == alive) {
-			printf("%4i", list[i].number);
+		if (list[i].status == Alive) {
+			printf("%4i ", list[i].number);
 		}
 		else {
 			printf("dead ");
